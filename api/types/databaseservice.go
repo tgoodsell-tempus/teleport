@@ -31,7 +31,7 @@ type DatabaseService interface {
 	GetNamespace() string
 
 	// GetResourceMatchers returns the resource matchers of the DatabaseService.
-	GetResourceMatchers() []Labels
+	GetResourceMatchers() []*DatabaseResourceMatcher
 }
 
 // NewDatabaseServiceV1 creates a new DatabaseService instance.
@@ -62,7 +62,7 @@ func (s *DatabaseServiceV1) CheckAndSetDefaults() error {
 }
 
 // GetResourceMatchers returns the resource matchers of the DatabaseService.
-func (s *DatabaseServiceV1) GetResourceMatchers() []Labels {
+func (s *DatabaseServiceV1) GetResourceMatchers() []*DatabaseResourceMatcher {
 	return s.Spec.ResourceMatchers
 }
 
@@ -71,34 +71,9 @@ func (s *DatabaseServiceV1) GetNamespace() string {
 	return s.Metadata.Namespace
 }
 
-// GetAllLabels returns combined static and dynamic labels.
-func (s *DatabaseServiceV1) GetAllLabels() map[string]string {
-	return s.Metadata.Labels
-}
-
-// GetStaticLabels returns the static labels.
-func (s *DatabaseServiceV1) GetStaticLabels() map[string]string {
-	return s.Metadata.Labels
-}
-
-// SetStaticLabels sets the static labels.
-func (s *DatabaseServiceV1) SetStaticLabels(sl map[string]string) {
-	s.Metadata.Labels = sl
-}
-
 // MatchSearch goes through select field values and tries to
 // match against the list of search values.
 func (s *DatabaseServiceV1) MatchSearch(values []string) bool {
 	fieldVals := append(utils.MapToStrings(s.GetAllLabels()), s.GetName())
 	return MatchSearch(fieldVals, values, nil)
-}
-
-// Origin returns the origin value of the resource.
-func (s *DatabaseServiceV1) Origin() string {
-	return s.Metadata.Origin()
-}
-
-// SetOrigin sets the origin value of the resource.
-func (s *DatabaseServiceV1) SetOrigin(origin string) {
-	s.Metadata.SetOrigin(origin)
 }
