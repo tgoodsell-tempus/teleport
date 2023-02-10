@@ -3,8 +3,7 @@ title: Running an HA Teleport cluster using AWS, EKS, and Helm
 description: Install and configure an HA Teleport cluster using an AWS EKS cluster
 ---
 
-In this guide, we'll go through how to set up a High Availability Teleport cluster with multiple replicas in Kubernetes
-using Teleport Helm charts and AWS products (DynamoDB and S3).
+In this guide, we'll go through how to set up a High Availability Teleport cluster using Teleport Helm charts that runs on AWS EKS.
 
 <ScopedBlock scope="cloud">
 
@@ -18,22 +17,17 @@ using Teleport Helm charts and AWS products (DynamoDB and S3).
 
 (!docs/pages/kubernetes-access/helm/includes/teleport-cluster-prereqs.mdx!)
 
-## Step 1/7. Install Helm
-
-(!docs/pages/kubernetes-access/helm/includes/teleport-cluster-install.mdx!)
-
-## Step 2/7. Add the Teleport Helm chart repository
+## Step 1/6. Add the Teleport Helm chart repository
 
 (!docs/pages/kubernetes-access/helm/includes/helm-repo-add.mdx!)
 
-## Step 3/7. Set up AWS IAM configuration
+## Step 2/6. Set up AWS IAM configuration
 
 For Teleport to be able to create the DynamoDB tables, indexes, and the S3 storage bucket it needs,
 you'll need to configure AWS IAM policies to allow access.
 
 <Admonition type="note">
-  These IAM policies should be added to your AWS account, then granted to the instance role associated with the
-  EKS nodegroups which are running your Kubernetes nodes.
+    Add these IAM policies to your AWS account and then grant it to the role associated with your EKS nodegroup(s).
 </Admonition>
 
 ### DynamoDB IAM policy
@@ -112,7 +106,7 @@ Note that Teleport will only use S3 buckets with versioning enabled. This
 ensures that a session log cannot be permanently altered or deleted, as
 Teleport will always look at the oldest version of a recording.
 
-## Step 4/7. Configure TLS certificates for Teleport
+## Step 3/6. Configure TLS certificates for Teleport
 
 The `teleport-cluster` chart deploys a Kubernetes `LoadBalancer` to handle incoming connections to the Teleport Proxy Service.
 
@@ -121,65 +115,29 @@ communications and allow external clients to connect.
 
 ### Determining an approach
 
-There are three supported options when using AWS. You must choose only one of
-these options:
+There are three supported options on AWS (choose one):
 
-#### Using `cert-manager`
-
-You can use `cert-manager` to provision and automatically renew TLS credentials
-by completing ACME challenges via Let's Encrypt. We recommend this approach if
-you require CLI access to web applications using client certificates via
-Teleport Application Access.
-
-#### Using AWS Certificate Manager
-
-You can use AWS Certificate Manager to handle TLS termination with AWS-managed
-certificates.
-
-You should be aware of the limitations for using AWS Certificate Manager to
-provision TLS credentials for Teleport:
-
-- This will prevent Teleport Application Access from working via CLI using
-  client certificates. Application Access will still work via a browser.
-- Command-line Application Access does not work with ACM. Using ACM will prevent
-  Teleport from facilitating Application Access via CLI (using client
-  certificates), as Teleport will not be handling its own TLS termination.
-- Using ACM through a AWS Load Balancer prevents the required traffic for
-  Postgres or MongoDB through Teleport's web port. If you choose to use the ACM
-  approach, we will show you how to configure a separate listener for Postgres
-  or MongoDB.
-
-<Notice type="warning">
-
-If you would like the Teleport Application Service and Database Service to
-function as expected, you should use the `cert-manager` approach unless there is
-a specific reason to use ACM.
-
-</Notice>
-
-#### Using your own TLS credentials
-
-With this approach, you are responsible for determining how to obtain a TLS
-certificate and private key for your Teleport cluster, and for renewing your
-credentials periodically. Use this approach if you would like to use a trusted
-internal certificate authority instead of Let's Encrypt or AWS Certificate
-Manager.
+- cert-manager
+- AWS Certificate Manager (ACM)
+- Your own TLS
 
 <Tabs>
 <TabItem label="cert-manager">
 
-In this example, we are using multiple pods to create a High Availability
-Teleport cluster. As such, we will be using `cert-manager` to centrally
-provision TLS certificates using Let's Encrypt. These certificates will be
-mounted into each Teleport pod, and automatically renewed and kept up to date by
-`cert-manager`.
+### Using `cert-manager`
 
-If you are planning to use `cert-manager`, you will need to add one IAM policy to your cluster to enable it
-to update Route53 records.
+`cert-manager` will provision and automatically renew TLS credentials
+by completing ACME challenges via Let's Encrypt. We recommend this approach if
+you require CLI access to web applications using client certificates via
+Teleport Application Access.
+
+We will be using `cert-manager` to centrally provision TLS certificates using Let's Encrypt. These certificates will be
+mounted into each Teleport pod, and automatically renewed and kept up to date by `cert-manager`.
 
 ### Route53 IAM policy
 
-This policy allows `cert-manager` to use DNS01 Let's Encrypt challenges to provision TLS certificates for your Teleport cluster.
+You will need to add one IAM policy to your cluster to enable it to update Route53 records. This policy
+allows `cert-manager` to use DNS01 Let's Encrypt challenges to provision TLS certificates for your Teleport cluster.
 
 You'll need to replace these values in the policy example below:
 
@@ -268,6 +226,29 @@ $ kubectl --namespace teleport create -f aws-issuer.yaml
 
 </TabItem>
 <TabItem label="AWS Certificate Manager">
+
+### Using AWS Certificate Manager (ACM)
+
+AWS Certificate Manager can handle TLS termination with AWS-managed certificates.
+
+There are limitations when using AWS Certificate Manager to provision TLS credentials for Teleport:
+
+- ACM will prevent Teleport Application Access from working via CLI using
+client certificates. Application Access will still work via a browser.
+- Command-line Application Access does not work with ACM. Using ACM will prevent
+Teleport from facilitating Application Access via CLI (using client
+certificates), as Teleport will not be handling its own TLS termination.
+- Using ACM through a AWS Load Balancer prevents the required traffic for
+Postgres or MongoDB through Teleport's web port. If you choose to use the ACM
+approach, we will show you how to configure a separate listener for Postgres
+or MongoDB.
+
+<Notice type="warning">
+    If you would like the Teleport Application Service and Database Service to
+    function as expected, you should use the `cert-manager` approach unless there is
+    a specific reason to use ACM.
+</Notice>
+
 In this step, you will configure Teleport to use AWS Certificate Manager (ACM)
 to provision your Teleport instances with TLS credentials.
 
@@ -306,7 +287,15 @@ depending on whether you are running PostgreSQL or MongoDB, to your values file:
   ```
 
 </TabItem>
-<TabItem label="Your own TLS credentials">
+<TabItem label="Your own TLS">
+
+### Your own TLS
+
+With this approach, you are responsible for determining how to obtain a TLS
+certificate and private key for your Teleport cluster, and for renewing your
+credentials periodically. Use this approach if you would like to use a trusted
+internal certificate authority instead of Let's Encrypt or AWS Certificate
+Manager.
 
 You can configure the `teleport-cluster` Helm chart to secure the Teleport Web
 UI using existing TLS credentials within a Kubernetes secret.
@@ -327,7 +316,7 @@ Edit your `values.yaml` file to refer to the name of your secret:
 </TabItem>
 </Tabs>
 
-## Step 5/7. Set values to configure the cluster
+## Step 4/6. Set values to configure the cluster
 
 <ScopedBlock scope="enterprise">
 
@@ -498,7 +487,7 @@ replicaset.apps/teleport-auth-57989d4cbd   2         2         2       22h
 replicaset.apps/teleport-proxy-c6bf55cfc   2         2         2       22h
 ```
 
-## Step 6/7. Set up DNS
+## Step 5/6. Set up DNS
 
 You'll need to set up a DNS `A` record for `teleport.example.com`. In our example, this record is an alias to an ELB.
 
@@ -566,7 +555,7 @@ $ aws route53 get-change --id "${CHANGEID?}" | jq '.ChangeInfo.Status'
 # "INSYNC"
 ```
 
-## Step 7/7. Create a Teleport user
+## Step 6/6. Create a Teleport user
 
 Create a user to be able to log into Teleport. This needs to be done on the Teleport auth server,
 so we can run the command using `kubectl`:
