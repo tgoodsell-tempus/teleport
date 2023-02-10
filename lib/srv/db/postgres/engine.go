@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/gravitational/trace"
 	"github.com/jackc/pgconn"
@@ -107,6 +108,16 @@ func (e *Engine) HandleConnection(ctx context.Context, sessionCtx *common.Sessio
 	if err != nil {
 		return trace.Wrap(err)
 	}
+	err = e.provisionUser(ctx, sessionCtx)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	defer func() {
+		err := e.deprovisionUser(ctx, sessionCtx)
+		if err != nil {
+			e.Log.WithError(err).Error("Failed to deprovision user.")
+		}
+	}()
 	// This is where we connect to the actual Postgres database.
 	server, hijackedConn, err := e.connect(ctx, sessionCtx)
 	if err != nil {
@@ -200,6 +211,70 @@ func (e *Engine) checkAccess(ctx context.Context, sessionCtx *common.Session) er
 		e.Audit.OnSessionStart(e.Context, sessionCtx, err)
 		return trace.Wrap(err)
 	}
+	return nil
+}
+
+var storedProcedure = `create or replace procedure teleport_delete_%v()
+language plpgsql
+as $$
+begin
+    if exists (select usename from pg_stat_activity where usename = '%v') then
+        raise notice 'User has active connections';
+    else
+        drop user %v;
+    end if;
+end;$$;
+`
+
+func (e *Engine) provisionUser(ctx context.Context, sessionCtx *common.Session) error {
+	databaseUser := sessionCtx.DatabaseUser
+	sessionCtx.DatabaseUser = sessionCtx.Database.GetAdminUser()
+	defer func() { sessionCtx.DatabaseUser = databaseUser }()
+	config, err := e.getConnectConfig(ctx, sessionCtx)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	conn, err := pgconn.ConnectConfig(ctx, config)
+	if err != nil {
+		return common.ConvertConnectError(err, sessionCtx)
+	}
+	defer conn.Close(ctx)
+	result := conn.Exec(ctx, fmt.Sprintf(storedProcedure, databaseUser, databaseUser, databaseUser))
+	if err = result.Close(); err != nil {
+		return trace.Wrap(err)
+	}
+	e.Log.Infof("Created stored procedure teleport_delete_%v", databaseUser)
+	result = conn.Exec(ctx, fmt.Sprintf("create role %v login", databaseUser))
+	if err = result.Close(); err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			e.Log.Infof("Postgres user %v already exists.", databaseUser)
+			return nil
+		}
+		return trace.Wrap(err)
+	}
+	e.Log.Infof("Created Postgres user %v.", databaseUser)
+	return nil
+}
+
+func (e *Engine) deprovisionUser(ctx context.Context, sessionCtx *common.Session) error {
+	databaseUser := sessionCtx.DatabaseUser
+	sessionCtx.DatabaseUser = "postgres"
+	defer func() { sessionCtx.DatabaseUser = databaseUser }()
+	config, err := e.getConnectConfig(ctx, sessionCtx)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	conn, err := pgconn.ConnectConfig(ctx, config)
+	if err != nil {
+		return common.ConvertConnectError(err, sessionCtx)
+	}
+	defer conn.Close(ctx)
+	// result := conn.Exec(ctx, fmt.Sprintf("drop role if exists %v", databaseUser))
+	result := conn.Exec(ctx, fmt.Sprintf("call teleport_delete_%v()", databaseUser))
+	if err = result.Close(); err != nil {
+		return trace.Wrap(err)
+	}
+	e.Log.Infof("Deleted Postgres user %v.", databaseUser)
 	return nil
 }
 

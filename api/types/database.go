@@ -116,6 +116,8 @@ type Database interface {
 	RequireAWSIAMRolesAsUsers() bool
 	// Copy returns a copy of this database resource.
 	Copy() *DatabaseV3
+	//
+	GetAdminUser() string
 }
 
 // NewDatabaseV3 creates a new database resource.
@@ -251,6 +253,10 @@ func (d *DatabaseV3) GetURI() string {
 // SetURI sets the database connection address.
 func (d *DatabaseV3) SetURI(uri string) {
 	d.Spec.URI = uri
+}
+
+func (d *DatabaseV3) GetAdminUser() string {
+	return d.Spec.AdminUser
 }
 
 // GetCA returns the database CA certificate. If more than one CA is set, then

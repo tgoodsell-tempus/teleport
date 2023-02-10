@@ -68,6 +68,8 @@ type Database struct {
 	AD DatabaseAD
 	// Azure contains Azure database configuration.
 	Azure DatabaseAzure
+	//
+	AdminUser string
 }
 
 // CheckAndSetDefaults validates the database proxy configuration.

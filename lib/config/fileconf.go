@@ -1727,6 +1727,8 @@ type Database struct {
 	AD DatabaseAD `yaml:"ad"`
 	// Azure contains Azure database configuration.
 	Azure DatabaseAzure `yaml:"azure"`
+	//
+	AdminUser string `yaml:"adminUser"`
 }
 
 // DatabaseAD contains database Active Directory configuration.

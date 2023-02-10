@@ -334,6 +334,7 @@ message DatabaseSpecV3 {
     (gogoproto.nullable) = false,
     (gogoproto.jsontag) = "mysql,omitempty"
   ];
+  string AdminUser = 11 [(gogoproto.jsontag) = "admin_user,omitempty"];
 }
 
 // DatabaseStatusV3 contains runtime information about the database.
