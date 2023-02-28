@@ -62,12 +62,12 @@ maintains an in-memory cache of all discovered EC2 instances and will only
 upsert resources that are new or had their labels changed.
 
 To reduce load on auth and backend, discovery service will send them in batches
-of `len(instances) / 600` using `UpsertDiscoveredServers()` API and stagger the
+of `len(instances) / 900` using `UpsertDiscoveredServers()` API and stagger the
 batches over some time interval (e.g. one batch per second).
 
-`DiscoveredServer` resources will have a 6 hour TTL and the discovery service
-will re-upsert the resource prior to its expiration, in addition to when the
-resource changes in the local cache.
+`DiscoveredServer` resources will have a 90 minute TTL (with some jitter) and
+the discovery service will re-upsert the resource 30 minutes prior to its
+expiration, in addition to when the resource changes in the local cache.
 
 ### Reconciling tags
 
