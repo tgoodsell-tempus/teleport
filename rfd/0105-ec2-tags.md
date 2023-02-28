@@ -62,8 +62,34 @@ maintains an in-memory cache of all discovered EC2 instances and will only
 upsert resources that are new or had their labels changed.
 
 To reduce load on auth and backend, discovery service will send them in batches
-of `len(instances) / 900` using `UpsertDiscoveredServers()` API and stagger the
-batches over some time interval (e.g. one batch per second).
+of minimum size of 5 using `UpsertDiscoveredServers()` API and will send 1
+batch per second at a maximum. The loop will target propagation of all labels
+within a max interval of 15 minutes which means for very large clusters some
+batch sizes will need to be increased. The algorithm will be:
+
+- Get all EC2 instances. Let's say, we have N of them.
+- Determine batch size. We divide N by our minimum batch size, say 5.
+  - If the result is <= 900, we can send them all in minimum batches over 15
+    minutes. We send them 5 per second. 100 node cluster will have labels
+    propagated within 20 seconds, and we'll support up to 4.5K clusters with
+    minimum batch size.
+  - If the result is > 900, we need to increase the batch size so we can send
+    them all within 15 minutes.
+
+Rough pseudocode illustrating this algorithm:
+
+```go
+instances := getInstances()
+batchSize := defaults.MinBatchSize
+if dynamicBatchSize := (len(instances) / 900) + 1; dynamicBatchSize > batchSize {
+    batchSize = dynamicBatchSize
+}
+for len(instances) > 0 {
+    send(instances[:batchSize])
+    instances = instances[batchSize:]
+    <-interval.Next()
+}
+```
 
 `DiscoveredServer` resources will have a 90 minute TTL (with some jitter) and
 the discovery service will re-upsert the resource 30 minutes prior to its
