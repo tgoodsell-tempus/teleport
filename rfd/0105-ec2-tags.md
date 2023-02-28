@@ -62,8 +62,12 @@ maintains an in-memory cache of all discovered EC2 instances and will only
 upsert resources that are new or had their labels changed.
 
 To reduce load on auth and backend, discovery service will send them in batches
-of 100 using `UpsertDiscoveredServers()` API and stagger batches over some time
-interval (e.g. one batch per second).
+of `len(instances) / 600` using `UpsertDiscoveredServers()` API and stagger the
+batches over some time interval (e.g. one batch per second).
+
+`DiscoveredServer` resources will have a 6 hour TTL and the discovery service
+will re-upsert the resource prior to its expiration, in addition to when the
+resource changes in the local cache.
 
 ### Reconciling tags
 
@@ -81,8 +85,8 @@ server.
 The reconciler will be rate-limited and load `DiscoveredServer` resources in
 batches of 100 (using `GetRange()`) at the rate of one batch per second.
 
-When applying tags from discovered servers, all existing node labels will be
-preserved, but `aws/` labels from the discovered server will take precedence.
+When applying tags from discovered servers all `aws/` labels heartbeat by the
+node will be cleared and replaced with `aws/` labels from the discovered server.
 
 ### Propagating tags
 
