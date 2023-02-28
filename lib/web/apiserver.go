@@ -592,6 +592,11 @@ func (h *Handler) bindDefaultEndpoints() {
 	// get login alerts
 	h.GET("/webapi/sites/:site/alerts", h.WithClusterAuth(h.clusterLoginAlertsGet))
 
+	// lock interactions
+	h.GET("/webapi/sites/:site/locks", h.WithClusterAuth(h.getClusterLocks))
+	h.PUT("/webapi/sites/:site/locks", h.WithClusterAuth(h.createClusterLock))
+	h.DELETE("/webapi/sites/:site/locks/:uuid", h.WithClusterAuth(h.deleteClusterLock))
+
 	// active sessions handlers
 	h.GET("/webapi/sites/:site/connect", h.WithClusterAuth(h.siteNodeConnect))  // connect to an active session (via websocket)
 	h.GET("/webapi/sites/:site/sessions", h.WithClusterAuth(h.siteSessionsGet)) // get active list of sessions
@@ -2318,6 +2323,87 @@ func createIdentityContext(login string, sessionCtx *SessionContext) (srv.Identi
 		ActiveRequests: accessRequestIDs,
 		Impersonator:   sshCert.Extensions[teleport.CertExtensionImpersonator],
 	}, nil
+}
+
+func (h *Handler) getClusterLocks(
+	w http.ResponseWriter,
+	r *http.Request,
+	p httprouter.Params,
+	sessionCtx *SessionContext,
+	site reversetunnel.RemoteSite) (interface{}, error) {
+	ctx := r.Context()
+	clt, err := sessionCtx.GetUserClient(r.Context(), site)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	locks, err := clt.GetLocks(ctx, false)
+
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return locks, nil
+}
+
+type createLockReq struct {
+	Targets types.LockTarget `json:"targets"`
+	Message string           `json:"message"`
+	TTL     string           `json:"ttl"`
+}
+
+func (h *Handler) createClusterLock(
+	w http.ResponseWriter,
+	r *http.Request,
+	p httprouter.Params,
+	sessionCtx *SessionContext,
+	site reversetunnel.RemoteSite) (interface{}, error) {
+	var req *createLockReq
+
+	if err := httplib.ReadJSON(r, &req); err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	ctx := r.Context()
+	clt, err := sessionCtx.GetUserClient(r.Context(), site)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	lock, err := types.NewLock(uuid.New().String(), types.LockSpecV2{
+		Target:  req.Targets,
+		Message: req.Message,
+	})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	err = clt.UpsertLock(ctx, lock)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return nil, nil
+}
+
+func (h *Handler) deleteClusterLock(
+	w http.ResponseWriter,
+	r *http.Request,
+	p httprouter.Params,
+	sessionCtx *SessionContext,
+	site reversetunnel.RemoteSite) (interface{}, error) {
+	ctx := r.Context()
+	clt, err := sessionCtx.GetUserClient(r.Context(), site)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	err = clt.DeleteLock(ctx, p.ByName("uuid"))
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return nil, nil
 }
 
 // siteNodeConnect connect to the site node
