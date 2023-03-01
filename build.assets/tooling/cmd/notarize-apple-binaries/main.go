@@ -32,6 +32,8 @@ type Config struct {
 	LogJSON       bool
 	AppleUsername string
 	ApplePassword string
+	DeveloperID   string
+	BundleID      string
 	BinaryPaths   []string
 }
 
@@ -41,6 +43,8 @@ func main() {
 	kingpin.Flag("log-json", "Enable JSON logging").Default(fmt.Sprintf("%v", false)).BoolVar(&config.LogJSON)
 	kingpin.Flag("apple-username", "Apple Connect username used for notarization").Required().Envar("APPLE_USERNAME").StringVar(&config.AppleUsername)
 	kingpin.Flag("apple-password", "Apple Connect password used for notarization").Required().Envar("APPLE_PASSWORD").StringVar(&config.ApplePassword)
+	kingpin.Flag("developer-id", "Key ID for signing binaries").Required().StringVar(&config.DeveloperID)
+	kingpin.Flag("bundle-id", "Bundle ID of application").Required().StringVar(&config.BundleID)
 	kingpin.Arg(binaryArgName, "Path to Apple binaries for signing and notarization").Required().Action(binaryArgValidatiorAction).ExistingFilesVar(&config.BinaryPaths)
 	kingpin.Parse()
 
@@ -113,7 +117,7 @@ func run(config *Config) error {
 	}
 	NewLoggerConfig(parsedLogLevel, config.LogJSON).setupLogger()
 
-	err = NewGonWrapper(config.AppleUsername, config.ApplePassword, config.BinaryPaths).SignAndNotarizeBinaries()
+	err = NewGonWrapper(config.AppleUsername, config.ApplePassword, config.DeveloperID, config.BundleID, config.BinaryPaths).SignAndNotarizeBinaries()
 	if err != nil {
 		return trace.Wrap(err, "failed to sign and notarize binaries")
 	}
