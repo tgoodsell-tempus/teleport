@@ -4161,6 +4161,41 @@ func (a *Server) SubmitUsageEvent(ctx context.Context, req *proto.SubmitUsageEve
 	return nil
 }
 
+// Ping gets basic info about the auth server.
+func (a *Server) Ping(ctx context.Context) (proto.PingResponse, error) {
+	// The Ping method does not require special permissions since it only returns
+	// basic status information.  This is an intentional design choice.  Alternative
+	// methods should be used for relaying any sensitive information.
+	cn, err := a.GetClusterName()
+	if err != nil {
+		return proto.PingResponse{}, trace.Wrap(err)
+	}
+
+	// license check result is loaded from real backend, and is not modified once loaded, so we
+	// can save a lot of IO by doing short-lived ttl caching.
+	heartbeat, err := utils.FnCacheGet(ctx, a.ttlCache, pingCacheKey{"license-check-result"}, a.GetLicenseCheckResult)
+	if err != nil {
+		log.Warnf("Failed to load license check result for Ping: %v", err)
+	}
+	var warnings []string
+	if heartbeat != nil {
+		for _, notification := range heartbeat.Spec.Notifications {
+			if notification.Type == LicenseExpiredNotification {
+				warnings = append(warnings, notification.Text)
+			}
+		}
+	}
+	return proto.PingResponse{
+		ClusterName:     cn.GetClusterName(),
+		ServerVersion:   teleport.Version,
+		ServerFeatures:  modules.GetModules().Features().ToProto(),
+		ProxyPublicAddr: a.getProxyPublicAddr(),
+		IsBoring:        modules.GetModules().IsBoringBinary(),
+		LicenseWarnings: warnings,
+		LoadAllCAs:      a.loadAllCAs,
+	}, nil
+}
+
 func (a *Server) isMFARequired(ctx context.Context, checker services.AccessChecker, req *proto.IsMFARequiredRequest) (*proto.IsMFARequiredResponse, error) {
 	authPref, err := a.GetAuthPreference(ctx)
 	if err != nil {
@@ -4701,6 +4736,24 @@ func (a *Server) GetLicense(ctx context.Context) (string, error) {
 		return "", trace.NotFound("license not found")
 	}
 	return fmt.Sprintf("%s%s", a.license.CertPEM, a.license.KeyPEM), nil
+}
+
+// getProxyPublicAddr gets the server's public proxy address.
+func (a *Server) getProxyPublicAddr() string {
+	if proxies, err := a.GetProxies(); err == nil {
+		for _, p := range proxies {
+			addr := p.GetPublicAddr()
+			if addr == "" {
+				continue
+			}
+			if _, err := utils.ParseAddr(addr); err != nil {
+				log.Warningf("Invalid public address on the proxy %q: %q: %v.", p.GetName(), addr, err)
+				continue
+			}
+			return addr
+		}
+	}
+	return ""
 }
 
 // authKeepAliver is a keep aliver using auth server directly

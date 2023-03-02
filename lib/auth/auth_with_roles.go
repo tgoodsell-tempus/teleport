@@ -2198,52 +2198,7 @@ func (a *ServerWithRoles) Ping(ctx context.Context) (proto.PingResponse, error) 
 	// The Ping method does not require special permissions since it only returns
 	// basic status information.  This is an intentional design choice.  Alternative
 	// methods should be used for relaying any sensitive information.
-	cn, err := a.authServer.GetClusterName()
-	if err != nil {
-		return proto.PingResponse{}, trace.Wrap(err)
-	}
-
-	// license check result is loaded from real backend, and is not modified once loaded, so we
-	// can save a lot of IO by doing short-lived ttl caching.
-	heartbeat, err := utils.FnCacheGet(ctx, a.authServer.ttlCache, pingCacheKey{"license-check-result"}, a.authServer.GetLicenseCheckResult)
-	if err != nil {
-		log.Warnf("Failed to load license check result for Ping: %v", err)
-	}
-	var warnings []string
-	if heartbeat != nil {
-		for _, notification := range heartbeat.Spec.Notifications {
-			if notification.Type == LicenseExpiredNotification {
-				warnings = append(warnings, notification.Text)
-			}
-		}
-	}
-	return proto.PingResponse{
-		ClusterName:     cn.GetClusterName(),
-		ServerVersion:   teleport.Version,
-		ServerFeatures:  modules.GetModules().Features().ToProto(),
-		ProxyPublicAddr: a.getProxyPublicAddr(),
-		IsBoring:        modules.GetModules().IsBoringBinary(),
-		LicenseWarnings: warnings,
-		LoadAllCAs:      a.authServer.loadAllCAs,
-	}, nil
-}
-
-// getProxyPublicAddr gets the server's public proxy address.
-func (a *ServerWithRoles) getProxyPublicAddr() string {
-	if proxies, err := a.authServer.GetProxies(); err == nil {
-		for _, p := range proxies {
-			addr := p.GetPublicAddr()
-			if addr == "" {
-				continue
-			}
-			if _, err := utils.ParseAddr(addr); err != nil {
-				log.Warningf("Invalid public address on the proxy %q: %q: %v.", p.GetName(), addr, err)
-				continue
-			}
-			return addr
-		}
-	}
-	return ""
+	return a.authServer.Ping(ctx)
 }
 
 func (a *ServerWithRoles) DeleteAccessRequest(ctx context.Context, name string) error {
