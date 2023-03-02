@@ -83,6 +83,9 @@ const Recordings = React.lazy(
 const AuthConnectors = React.lazy(
   () => import(/* webpackChunkName: "auth-connectors" */ './AuthConnectors')
 );
+const Locks = React.lazy(
+  () => import(/* webpackChunkName: "lazy" */ './Locks')
+);
 const Databases = React.lazy(
   () => import(/* webpackChunkName: "databases" */ './Databases')
 );
@@ -322,6 +325,31 @@ export class FeatureAuthConnectors implements TeleportFeature {
   };
 }
 
+export class FeatureLocks implements TeleportFeature {
+  category = NavigationCategory.Management;
+  section = ManagementSection.Access;
+
+  route = {
+    title: 'Session & Identity Locks',
+    path: cfg.routes.locks,
+    exact: false,
+    component: Locks,
+  };
+
+  hasAccess() {
+    return true;
+  }
+
+  navigationItem = {
+    title: 'Session & Identity Locks',
+    icon: <AuthConnectorsIcon />,
+    exact: false,
+    getLink(clusterId: string) {
+      return cfg.getLocksRoute(clusterId);
+    },
+  };
+}
+
 export class FeatureDiscover implements TeleportFeature {
   route = {
     title: 'Enroll New Resource',
@@ -509,6 +537,7 @@ export function getOSSFeatures(): TeleportFeature[] {
     new FeatureUsers(),
     new FeatureRoles(),
     new FeatureAuthConnectors(),
+    new FeatureLocks(),
     new FeatureDiscover(),
 
     // - Activity

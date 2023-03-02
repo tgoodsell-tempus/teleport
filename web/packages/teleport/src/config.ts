@@ -94,6 +94,7 @@ const cfg = {
     consoleConnect: '/web/cluster/:clusterId/console/node/:serverId/:login',
     consoleSession: '/web/cluster/:clusterId/console/session/:sid',
     player: '/web/cluster/:clusterId/session/:sid', // ?recordingType=ssh|desktop|k8s&durationMs=1234
+    locks: '/web/cluster/:clusterId/locks',
     login: '/web/login',
     loginSuccess: '/web/msg/info/login_success',
     loginErrorLegacy: '/web/msg/error/login_failed',
@@ -183,6 +184,9 @@ const cfg = {
     mfaDevicesWithTokenPath: '/v1/webapi/mfa/token/:tokenId/devices',
     mfaDevicesPath: '/v1/webapi/mfa/devices',
     mfaDevicePath: '/v1/webapi/mfa/token/:tokenId/devices/:deviceName',
+
+    locksPath: '/v1/webapi/sites/:clusterId/locks',
+    locksPathWithUUID: '/v1/webapi/sites/:clusterId/locks/:uuid',
 
     dbSign: 'v1/webapi/sites/:clusterId/sign/db',
 
@@ -470,6 +474,18 @@ const cfg = {
       clusterId,
       ...params,
     });
+  },
+
+  getLocksRoute(clusterId: string) {
+    return generatePath(cfg.routes.locks, { clusterId });
+  },
+
+  getLocksUrl(clusterId: string) {
+    return generatePath(cfg.api.locksPath, { clusterId });
+  },
+
+  getLocksUrlWithUUID(clusterId: string, uuid: string) {
+    return generatePath(cfg.api.locksPathWithUUID, { clusterId, uuid });
   },
 
   getDatabaseSignUrl(clusterId: string) {
