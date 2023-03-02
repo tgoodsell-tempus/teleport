@@ -2325,6 +2325,13 @@ func createIdentityContext(login string, sessionCtx *SessionContext) (srv.Identi
 	}, nil
 }
 
+type UILock struct {
+	Name    string           `json:"name"`
+	Message string           `json:"message"`
+	Expires string           `json:"expires"`
+	Targets types.LockTarget `json:"targets"`
+}
+
 func (h *Handler) getClusterLocks(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -2338,12 +2345,23 @@ func (h *Handler) getClusterLocks(
 	}
 
 	locks, err := clt.GetLocks(ctx, false)
-
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	return locks, nil
+	// Lock data structure is reformatted to save doing it on the client as the
+	// Table component doesn't support nested complex objects.
+	var lockList []UILock
+	for i := 0; i < len(locks); i++ {
+		lockList = append(lockList, UILock{
+			locks[i].GetMetadata().Name,
+			locks[i].Message(),
+			locks[i].LockExpiry().Format(time.RFC3339Nano),
+			locks[i].Target(),
+		})
+	}
+
+	return lockList, nil
 }
 
 type createLockReq struct {
