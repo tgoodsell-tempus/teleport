@@ -24,6 +24,7 @@ import SideNav from './SideNav';
 import Servers from './Servers';
 import Databases from './Databases';
 import Kubes from './Kubes';
+import { Spotlight } from './Spotlight';
 
 export default function ClusterResources() {
   const clusterCtx = useClusterContext();
@@ -46,6 +47,7 @@ export default function ClusterResources() {
           {clusterCtx.isLocationActive('/resources/servers') && <Servers />}
           {clusterCtx.isLocationActive('/resources/databases') && <Databases />}
           {clusterCtx.isLocationActive('/resources/kubes') && <Kubes />}
+          {clusterCtx.isLocationActive('/resources/spotlight') && <Spotlight />}
         </HorizontalSplit>
       </Flex>
     </StyledMain>

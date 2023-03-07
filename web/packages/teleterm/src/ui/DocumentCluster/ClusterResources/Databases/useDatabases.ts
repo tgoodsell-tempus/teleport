@@ -35,6 +35,7 @@ export function useDatabases() {
         appContext.resourcesService.fetchDatabases(params)
     );
 
+  // TODO: This should be extracted to a separate hook so that we can reuse it.
   function connect(db: ReturnType<typeof makeDatabase>, dbUser: string): void {
     const rootClusterUri = routing.ensureRootClusterUri(db.uri);
     const documentsService =

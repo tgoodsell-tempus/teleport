@@ -19,7 +19,7 @@ import styled from 'styled-components';
 import { Box, Flex, Label, Text } from 'design';
 import { makeLabelTag } from 'teleport/components/formatters';
 
-import { Cli, Server, Person, Database } from 'design/Icon';
+import * as icons from 'design/Icon';
 
 import * as types from 'teleterm/ui/services/quickInput/types';
 
@@ -79,9 +79,9 @@ export default QuickInputList;
 
 function CmdItem(props: { item: types.SuggestionCmd }) {
   return (
-    <Flex alignItems="baseline">
+    <Flex alignItems="flex-start">
       <SquareIconBackground color="#512FC9">
-        <Cli fontSize="10px" />
+        <icons.Cli fontSize="20px" />
       </SquareIconBackground>
       {/* Equivalent of flex-shrink: 0, but styled-system doesn't support flex-shrink. */}
       <Box flex="0 0 auto" mr={2}>
@@ -94,9 +94,9 @@ function CmdItem(props: { item: types.SuggestionCmd }) {
 
 function SshLoginItem(props: { item: types.SuggestionSshLogin }) {
   return (
-    <Flex alignItems="baseline">
+    <Flex alignItems="flex-start">
       <SquareIconBackground color="#FFAB00">
-        <Person fontSize="10px" />
+        <icons.Person fontSize="20px" />
       </SquareIconBackground>
       <Box mr={2}>{props.item.data}</Box>
     </Flex>
@@ -112,9 +112,9 @@ function ServerItem(props: { item: types.SuggestionServer }) {
   ));
 
   return (
-    <Flex alignItems="baseline" p={1} minWidth="300px">
+    <Flex alignItems="flex-start" p={1} minWidth="300px">
       <SquareIconBackground color="#4DB2F0">
-        <Server fontSize="10px" />
+        <icons.Server fontSize="20px" />
       </SquareIconBackground>
       <Flex flexDirection="column" ml={1}>
         <Box mr={2}>{hostname}</Box>
@@ -133,9 +133,9 @@ function DatabaseItem(props: { item: types.SuggestionDatabase }) {
   ));
 
   return (
-    <Flex alignItems="baseline" p={1} minWidth="300px">
+    <Flex alignItems="flex-start" p={1} minWidth="300px">
       <SquareIconBackground color="#4DB2F0">
-        <Database fontSize="10px" />
+        <icons.Database fontSize="20px" />
       </SquareIconBackground>
       <Flex flexDirection="column" ml={1} flex={1}>
         <Flex justifyContent="space-between" alignItems="center">
@@ -152,12 +152,33 @@ function DatabaseItem(props: { item: types.SuggestionDatabase }) {
   );
 }
 
+function KubeItem(props: { item: types.SuggestionKube }) {
+  const { name, labelsList } = props.item.data;
+  const $labels = labelsList.map((label, index) => (
+    <Label mr="1" key={index} kind="secondary">
+      {makeLabelTag(label)}
+    </Label>
+  ));
+
+  return (
+    <Flex alignItems="flex-start" p={1} minWidth="300px">
+      <SquareIconBackground color="#4DB2F0">
+        <icons.Kubernetes fontSize="20px" />
+      </SquareIconBackground>
+      <Flex flexDirection="column" ml={1}>
+        <Box mr={2}>{name}</Box>
+        <Box>{$labels}</Box>
+      </Flex>
+    </Flex>
+  );
+}
+
 function UnknownItem(props: { item: types.Suggestion }) {
   const { kind } = props.item;
   return <div>unknown kind: {kind} </div>;
 }
 
-const StyledItem = styled.div(({ theme, $active }) => {
+export const StyledItem = styled.div(({ theme, $active }) => {
   return {
     '&:hover, &:focus': {
       cursor: 'pointer',
@@ -194,7 +215,7 @@ const StyledGlobalSearchResults = styled.div(({ theme, position }) => {
   };
 });
 
-const ComponentMap: Record<
+export const ComponentMap: Record<
   types.Suggestion['kind'],
   React.FC<{ item: types.Suggestion }>
 > = {
@@ -202,6 +223,7 @@ const ComponentMap: Record<
   ['suggestion.ssh-login']: SshLoginItem,
   ['suggestion.server']: ServerItem,
   ['suggestion.database']: DatabaseItem,
+  ['suggestion.kube']: KubeItem,
 };
 
 type Props = {
@@ -216,8 +238,8 @@ const SquareIconBackground = styled(Box)`
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 14px;
-  width: 14px;
+  height: 26px;
+  width: 26px;
   margin-right: 8px;
   border-radius: 2px;
   padding: 4px;

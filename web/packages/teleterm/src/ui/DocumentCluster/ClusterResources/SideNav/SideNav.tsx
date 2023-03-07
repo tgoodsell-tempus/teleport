@@ -68,9 +68,9 @@ function createItems(): SideNavItem[] {
       to: '/resources/kubes',
       title: `Kubes`,
     },
-    // {
-    //   to: '/resources/apps',
-    //   title: `Apps`,
-    // },
+    {
+      to: '/resources/spotlight',
+      title: `Spotlight`,
+    },
   ];
 }

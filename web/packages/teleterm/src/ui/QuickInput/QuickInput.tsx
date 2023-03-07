@@ -195,7 +195,7 @@ const MeasuringInput = styled.span`
   visibility: hidden;
 `;
 
-const Input = styled.input(props => {
+export const Input = styled.input(props => {
   const { theme } = props;
   return {
     height: '100%',

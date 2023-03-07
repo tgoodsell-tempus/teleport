@@ -151,7 +151,7 @@ export type NavLocation =
   | '/resources/'
   | '/resources/databases'
   | '/resources/servers'
-  | '/resources/apps'
+  | '/resources/spotlight'
   | '/resources/kubes';
 
 export default ClusterContext;

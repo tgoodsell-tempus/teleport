@@ -23,7 +23,7 @@ import {
   WorkspacesService,
 } from 'teleterm/ui/services/workspacesService';
 import { StatePersistenceService } from 'teleterm/ui/services/statePersistence';
-import { RootClusterUri, routing } from 'teleterm/ui/uri';
+import { RootClusterUri, ResourceUri, routing } from 'teleterm/ui/uri';
 
 import { ImmutableStore } from '../immutableStore';
 
@@ -107,6 +107,23 @@ export class ConnectionTrackerService extends ImmutableStore<ConnectionTrackerSt
           getGatewayConnectionByDocument(document)
         );
     }
+  }
+
+  // This just opens the first connection found for the given resource, essentially choosing the
+  // server login or db user for you.
+  // For testing purposes only. We shouldn't use logic like this in the real app, probably.
+  findConnectionByResourceUri(resourceUri: ResourceUri): TrackedConnection {
+    return this.state.connections.find(conn => {
+      switch (conn.kind) {
+        case 'connection.gateway': {
+          return conn.targetUri === resourceUri;
+        }
+        case 'connection.server':
+          return conn.serverUri === resourceUri;
+        case 'connection.kube':
+          return conn.kubeUri === resourceUri;
+      }
+    });
   }
 
   setState(

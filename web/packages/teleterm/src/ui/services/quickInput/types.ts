@@ -40,11 +40,14 @@ export type SuggestionDatabase = SuggestionBase<
   tsh.Database
 >;
 
+export type SuggestionKube = SuggestionBase<'suggestion.kube', tsh.Kube>;
+
 export type Suggestion =
   | SuggestionCmd
   | SuggestionSshLogin
   | SuggestionServer
-  | SuggestionDatabase;
+  | SuggestionDatabase
+  | SuggestionKube;
 
 export type QuickInputParser = {
   parse(input: string, startIndex: number): ParseResult;
