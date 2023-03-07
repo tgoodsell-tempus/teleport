@@ -773,7 +773,7 @@
               "slug": "/server-access/guides/ec2-discovery/"
             },
             {
-              "title": "Azure Instance Discovery",
+              "title": "Azure Instance Discovery (Preview)",
               "slug": "/server-access/guides/azure-discovery/"
             },
             {
