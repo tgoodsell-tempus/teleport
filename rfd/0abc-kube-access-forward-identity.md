@@ -23,7 +23,7 @@ Teleport Kubernetes Service and remote Teleport proxy.
 ## Why
 
 When a user connects to a Teleport proxy, the proxy will authenticate the user
-using X.509 certificate. Kubernetes Proxy will then forward the request to the
+using his X.509 certificate. Kubernetes Proxy will then forward the request to the
 Teleport service responsible for serving the Kubernetes cluster (Kube Service) or
 to the remote Teleport proxy when the Kubernetes Cluster belongs to a trusted cluster.
 For the proxy to be able to forward the user's identity to the correct service,
@@ -63,33 +63,42 @@ a new certificate for each user's identity.
 
 ## Details
 
-The Proxy will authenticate to the Kube Service and remote Teleport proxy using its
+The Proxy will authenticate to the Kube Service and any remote Teleport proxy using its
 certificate. The proxy certificate does not contain any user identification
 and it's signed by the Teleport CA. The proxy will then forward the user's identity
-using HTTP headers or Proxy Protocol extensions.
+using HTTP headers or Proxy Protocol extensions (one or the other, not both).
 
 This change will remove the requirement for the proxy to generate a new certificate
 and thus call auth's `ProcessKubeCSR` endpoint to sign the key-pair containing the
 user's identity.
 
-To keep a chain of trust between the proxy and the upstream service, the
-user's identity forwarded by the proxy will be signed by the Teleport Proxy CA.
-
 Here we present two options for forwarding the user's identity:
 
-### Option 1: Forward user identity using HTTP headers
+### Option 1: Impersonation: Forward user identity using HTTP headers
 
 As opposed to the majority of protocols supported by Teleport, the Kubernetes protocol
 is based on HTTP 1/2. This allows us to forward the user's identity using HTTP headers
 for the specific case of Kubernetes.
 
+The proposed solution is to use the Proxy certificate to authenticate to the upstream
+service and to forward the user's identity using HTTP headers for later Impersonation.
+
+Once the upstream service receives a request, it will check the proxy certificate
+to validate the request's provenance and its role - making sure it's proxy - for
+authenticating the request. Once authenticated, it will impersonate the identity
+contained in the request HTTP headers. After trusting the identity received,
+the upstream service will impersonate the identity in a similar way to when the
+user connects to the proxy or the Kube Service.
+
+This approach is similar to what Kubernetes API does when
+forwarding requests to the API server using Impersonation. In the Teleport case, we must
+forward the full user's identity instead of just the username/roles.
+
 Since the proxy has full access to the HTTP request, it can add the user's identity
-to the request headers before forwarding it to the upstream service. The upstream
-service will then be able to extract the user's identity from the request headers
-and use it to authorize the request after validating its provenance.
+to the request headers before forwarding it to the upstream service.
 
 ```go
-headers["TELEPORT_USER_IDENTITY"] = sign(clientCert.Subject)
+headers["TELEPORT_IMPERSONATE_IDENTITY"] = clientCert.Subject
 ```
 
 Besides the security benefits, this option also has the advantage of allowing us to
@@ -98,7 +107,7 @@ because the HTTP headers are sent with each request and we do not require a new
 connection per request such as in the Proxy Protocol option. This will improve
 performance by reducing the number of connections that need to be established and
 the time it takes to forward a new request upstream. Currently, the proxy creates a new
-`http.Transport` for each request which means that a new connection is established
+`http.Transport` per request which means that a new connection is established
 every time a request is forwarded. This is not ideal because it increases the
 latency of the request and it also increases the load on the upstream service.
 
@@ -131,16 +140,17 @@ To avoid breaking changes, we will implement this feature in two phases.
 - Teleport 13.0
 
 We will add support for receiving user identity in Kube Service/Proxy from the
-Kube Proxy.
+Kube Proxy. Teleport heartbeats contain the agent version and the proxy will
+only forward the user's identity to the Kube Service/Proxy if the agent version
+is >= 13.0. For older agents, the proxy will continue to generate a new certificate
+for each user's identity and call the `ProcessKubeCSR` endpoint. This will allow
+us to roll out this feature without breaking changes to Teleport clusters running
+older versions (<= 12.0).
 
-When the X.509 certificate used by the proxy to authenticate to the upstream service
-has the `role=proxy`, the upstream service will expect the user's identity to be
+When the proxy uses its X.509 certificate to authenticate to the upstream service,
+the upstream service will expect the user's identity to be
 forwarded using HTTP headers or Proxy Protocol extensions. If the user's identity
 is not forwarded, the upstream service will reject the request.
-
-During this phase, the proxy will continue to generate a new certificate for each
-user's identity and call the `ProcessKubeCSR` endpoint. This will allow us to roll out
-this feature without breaking changes to Teleport clusters running older versions (<= 12.0).
 
 ### Phase 2: Enable the proxy forwarding of user identity to Kube Service/Proxy
 
