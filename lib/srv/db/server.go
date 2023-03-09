@@ -1033,6 +1033,8 @@ func (s *Server) authorize(ctx context.Context) (*common.Session, error) {
 	}
 	s.log.Debugf("Will connect to database %q at %v.", database.GetName(),
 		database.GetURI())
+	meta := database.GetAWS()
+	s.log.Debugf("Database has AWS role: %v externalID: %v", meta.AssumeRoleARN, meta.ExternalID)
 	id := uuid.New().String()
 	return &common.Session{
 		ID:                id,

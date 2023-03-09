@@ -45,7 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/gravitational/teleport/api/types"
-	awsutils "github.com/gravitational/teleport/api/utils/aws"
+	apiawsutils "github.com/gravitational/teleport/api/utils/aws"
 	azureutils "github.com/gravitational/teleport/api/utils/azure"
 	libcloudaws "github.com/gravitational/teleport/lib/cloud/aws"
 	"github.com/gravitational/teleport/lib/cloud/azure"
@@ -53,6 +53,7 @@ import (
 	"github.com/gravitational/teleport/lib/srv/db/redis/connection"
 	"github.com/gravitational/teleport/lib/tlsca"
 	"github.com/gravitational/teleport/lib/utils"
+	awsutils "github.com/gravitational/teleport/lib/utils/aws"
 )
 
 // DatabaseGetter defines interface for fetching database resources.
@@ -193,6 +194,23 @@ func ValidateDatabase(db types.Database) error {
 		}
 		if db.GetAD().SPN == "" {
 			return trace.BadParameter("missing service principal name for database %q", db.GetName())
+		}
+	}
+
+	awsMeta := db.GetAWS()
+	if awsMeta.AssumeRoleARN != "" {
+		if awsMeta.AccountID == "" {
+			return trace.BadParameter("database %q missing AWS account ID", db.GetName())
+		}
+		parsed, err := awsutils.ParseRoleARN(awsMeta.AssumeRoleARN)
+		if err != nil {
+			return trace.BadParameter("database %q assume_role_arn %q is invalid: %v",
+				db.GetName(), awsMeta.AssumeRoleARN, err)
+		}
+		err = awsutils.CheckARNPartitionAndAccount(parsed, awsMeta.Partition(), awsMeta.AccountID)
+		if err != nil {
+			return trace.BadParameter("database %q is incompatible with AWS assume_role_arn %q: %v",
+				db.GetName(), awsMeta.AssumeRoleARN, err)
 		}
 	}
 	return nil
@@ -500,12 +518,12 @@ func NewDatabaseFromAzurePostgresFlexServer(server *armpostgresqlflexibleservers
 }
 
 // NewDatabaseFromRDSInstance creates a database resource from an RDS instance.
-func NewDatabaseFromRDSInstance(instance *rds.DBInstance) (types.Database, error) {
+func NewDatabaseFromRDSInstance(instance *rds.DBInstance, role AssumeRole) (types.Database, error) {
 	endpoint := instance.Endpoint
 	if endpoint == nil {
 		return nil, trace.BadParameter("empty endpoint")
 	}
-	metadata, err := MetadataFromRDSInstance(instance)
+	metadata, err := MetadataFromRDSInstance(instance, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -527,8 +545,8 @@ func NewDatabaseFromRDSInstance(instance *rds.DBInstance) (types.Database, error
 }
 
 // NewDatabaseFromRDSCluster creates a database resource from an RDS cluster (Aurora).
-func NewDatabaseFromRDSCluster(cluster *rds.DBCluster) (types.Database, error) {
-	metadata, err := MetadataFromRDSCluster(cluster)
+func NewDatabaseFromRDSCluster(cluster *rds.DBCluster, role AssumeRole) (types.Database, error) {
+	metadata, err := MetadataFromRDSCluster(cluster, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -549,8 +567,8 @@ func NewDatabaseFromRDSCluster(cluster *rds.DBCluster) (types.Database, error) {
 }
 
 // NewDatabaseFromRDSClusterReaderEndpoint creates a database resource from an RDS cluster reader endpoint (Aurora).
-func NewDatabaseFromRDSClusterReaderEndpoint(cluster *rds.DBCluster) (types.Database, error) {
-	metadata, err := MetadataFromRDSCluster(cluster)
+func NewDatabaseFromRDSClusterReaderEndpoint(cluster *rds.DBCluster, role AssumeRole) (types.Database, error) {
+	metadata, err := MetadataFromRDSCluster(cluster, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -571,8 +589,8 @@ func NewDatabaseFromRDSClusterReaderEndpoint(cluster *rds.DBCluster) (types.Data
 }
 
 // NewDatabasesFromRDSClusterCustomEndpoints creates database resources from RDS cluster custom endpoints (Aurora).
-func NewDatabasesFromRDSClusterCustomEndpoints(cluster *rds.DBCluster) (types.Databases, error) {
-	metadata, err := MetadataFromRDSCluster(cluster)
+func NewDatabasesFromRDSClusterCustomEndpoints(cluster *rds.DBCluster, role AssumeRole) (types.Databases, error) {
+	metadata, err := MetadataFromRDSCluster(cluster, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -586,7 +604,7 @@ func NewDatabasesFromRDSClusterCustomEndpoints(cluster *rds.DBCluster) (types.Da
 	for _, endpoint := range cluster.CustomEndpoints {
 		// RDS custom endpoint format:
 		// <endpointName>.cluster-custom-<customerDnsIdentifier>.<dnsSuffix>
-		endpointDetails, err := awsutils.ParseRDSEndpoint(aws.StringValue(endpoint))
+		endpointDetails, err := apiawsutils.ParseRDSEndpoint(aws.StringValue(endpoint))
 		if err != nil {
 			errors = append(errors, trace.Wrap(err))
 			continue
@@ -624,8 +642,8 @@ func NewDatabasesFromRDSClusterCustomEndpoints(cluster *rds.DBCluster) (types.Da
 }
 
 // NewDatabaseFromRDSProxy creates database resource from RDS Proxy.
-func NewDatabaseFromRDSProxy(dbProxy *rds.DBProxy, port int64, tags []*rds.Tag) (types.Database, error) {
-	metadata, err := MetadataFromRDSProxy(dbProxy)
+func NewDatabaseFromRDSProxy(dbProxy *rds.DBProxy, port int64, tags []*rds.Tag, role AssumeRole) (types.Database, error) {
+	metadata, err := MetadataFromRDSProxy(dbProxy, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -647,8 +665,8 @@ func NewDatabaseFromRDSProxy(dbProxy *rds.DBProxy, port int64, tags []*rds.Tag) 
 
 // NewDatabaseFromRDSProxyCustomEndpiont creates database resource from RDS
 // Proxy custom endpoint.
-func NewDatabaseFromRDSProxyCustomEndpoint(dbProxy *rds.DBProxy, customEndpoint *rds.DBProxyEndpoint, port int64, tags []*rds.Tag) (types.Database, error) {
-	metadata, err := MetadataFromRDSProxyCustomEndpoint(dbProxy, customEndpoint)
+func NewDatabaseFromRDSProxyCustomEndpoint(dbProxy *rds.DBProxy, customEndpoint *rds.DBProxyEndpoint, port int64, tags []*rds.Tag, role AssumeRole) (types.Database, error) {
+	metadata, err := MetadataFromRDSProxyCustomEndpoint(dbProxy, customEndpoint, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -682,14 +700,14 @@ func NewDatabaseFromRDSProxyCustomEndpoint(dbProxy *rds.DBProxy, customEndpoint 
 }
 
 // NewDatabaseFromRedshiftCluster creates a database resource from a Redshift cluster.
-func NewDatabaseFromRedshiftCluster(cluster *redshift.Cluster) (types.Database, error) {
+func NewDatabaseFromRedshiftCluster(cluster *redshift.Cluster, role AssumeRole) (types.Database, error) {
 	// Endpoint can be nil while the cluster is being created. Return an error
 	// until the Endpoint is available.
 	if cluster.Endpoint == nil {
 		return nil, trace.BadParameter("missing endpoint in Redshift cluster %v", aws.StringValue(cluster.ClusterIdentifier))
 	}
 
-	metadata, err := MetadataFromRedshiftCluster(cluster)
+	metadata, err := MetadataFromRedshiftCluster(cluster, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -708,21 +726,21 @@ func NewDatabaseFromRedshiftCluster(cluster *redshift.Cluster) (types.Database, 
 
 // NewDatabaseFromElastiCacheConfigurationEndpoint creates a database resource
 // from ElastiCache configuration endpoint.
-func NewDatabaseFromElastiCacheConfigurationEndpoint(cluster *elasticache.ReplicationGroup, extraLabels map[string]string) (types.Database, error) {
+func NewDatabaseFromElastiCacheConfigurationEndpoint(cluster *elasticache.ReplicationGroup, extraLabels map[string]string, role AssumeRole) (types.Database, error) {
 	if cluster.ConfigurationEndpoint == nil {
 		return nil, trace.BadParameter("missing configuration endpoint")
 	}
 
-	return newElastiCacheDatabase(cluster, cluster.ConfigurationEndpoint, awsutils.ElastiCacheConfigurationEndpoint, extraLabels)
+	return newElastiCacheDatabase(cluster, cluster.ConfigurationEndpoint, apiawsutils.ElastiCacheConfigurationEndpoint, extraLabels, role)
 }
 
 // NewDatabasesFromElastiCacheNodeGroups creates database resources from
 // ElastiCache node groups.
-func NewDatabasesFromElastiCacheNodeGroups(cluster *elasticache.ReplicationGroup, extraLabels map[string]string) (types.Databases, error) {
+func NewDatabasesFromElastiCacheNodeGroups(cluster *elasticache.ReplicationGroup, extraLabels map[string]string, role AssumeRole) (types.Databases, error) {
 	var databases types.Databases
 	for _, nodeGroup := range cluster.NodeGroups {
 		if nodeGroup.PrimaryEndpoint != nil {
-			database, err := newElastiCacheDatabase(cluster, nodeGroup.PrimaryEndpoint, awsutils.ElastiCachePrimaryEndpoint, extraLabels)
+			database, err := newElastiCacheDatabase(cluster, nodeGroup.PrimaryEndpoint, apiawsutils.ElastiCachePrimaryEndpoint, extraLabels, role)
 			if err != nil {
 				return nil, trace.Wrap(err)
 			}
@@ -730,7 +748,7 @@ func NewDatabasesFromElastiCacheNodeGroups(cluster *elasticache.ReplicationGroup
 		}
 
 		if nodeGroup.ReaderEndpoint != nil {
-			database, err := newElastiCacheDatabase(cluster, nodeGroup.ReaderEndpoint, awsutils.ElastiCacheReaderEndpoint, extraLabels)
+			database, err := newElastiCacheDatabase(cluster, nodeGroup.ReaderEndpoint, apiawsutils.ElastiCacheReaderEndpoint, extraLabels, role)
 			if err != nil {
 				return nil, trace.Wrap(err)
 			}
@@ -741,14 +759,14 @@ func NewDatabasesFromElastiCacheNodeGroups(cluster *elasticache.ReplicationGroup
 }
 
 // newElastiCacheDatabase returns a new ElastiCache database.
-func newElastiCacheDatabase(cluster *elasticache.ReplicationGroup, endpoint *elasticache.Endpoint, endpointType string, extraLabels map[string]string) (types.Database, error) {
-	metadata, err := MetadataFromElastiCacheCluster(cluster, endpointType)
+func newElastiCacheDatabase(cluster *elasticache.ReplicationGroup, endpoint *elasticache.Endpoint, endpointType string, extraLabels map[string]string, role AssumeRole) (types.Database, error) {
+	metadata, err := MetadataFromElastiCacheCluster(cluster, endpointType, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
 	suffix := make([]string, 0)
-	if endpointType == awsutils.ElastiCacheReaderEndpoint {
+	if endpointType == apiawsutils.ElastiCacheReaderEndpoint {
 		suffix = []string{endpointType}
 	}
 
@@ -764,10 +782,10 @@ func newElastiCacheDatabase(cluster *elasticache.ReplicationGroup, endpoint *ela
 
 // NewDatabaseFromMemoryDBCluster creates a database resource from a MemoryDB
 // cluster.
-func NewDatabaseFromMemoryDBCluster(cluster *memorydb.Cluster, extraLabels map[string]string) (types.Database, error) {
-	endpointType := awsutils.MemoryDBClusterEndpoint
+func NewDatabaseFromMemoryDBCluster(cluster *memorydb.Cluster, extraLabels map[string]string, role AssumeRole) (types.Database, error) {
+	endpointType := apiawsutils.MemoryDBClusterEndpoint
 
-	metadata, err := MetadataFromMemoryDBCluster(cluster, endpointType)
+	metadata, err := MetadataFromMemoryDBCluster(cluster, endpointType, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -786,12 +804,12 @@ func NewDatabaseFromMemoryDBCluster(cluster *memorydb.Cluster, extraLabels map[s
 
 // NewDatabaseFromRedshiftServerlessWorkgroup creates a database resource from
 // a Redshift Serverless Workgroup.
-func NewDatabaseFromRedshiftServerlessWorkgroup(workgroup *redshiftserverless.Workgroup, tags []*redshiftserverless.Tag) (types.Database, error) {
+func NewDatabaseFromRedshiftServerlessWorkgroup(workgroup *redshiftserverless.Workgroup, tags []*redshiftserverless.Tag, role AssumeRole) (types.Database, error) {
 	if workgroup.Endpoint == nil {
 		return nil, trace.BadParameter("missing endpoint")
 	}
 
-	metadata, err := MetadataFromRedshiftServerlessWorkgroup(workgroup)
+	metadata, err := MetadataFromRedshiftServerlessWorkgroup(workgroup, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -810,12 +828,12 @@ func NewDatabaseFromRedshiftServerlessWorkgroup(workgroup *redshiftserverless.Wo
 
 // NewDatabaseFromRedshiftServerlessVPCEndpoint creates a database resource from
 // a Redshift Serverless VPC endpoint.
-func NewDatabaseFromRedshiftServerlessVPCEndpoint(endpoint *redshiftserverless.EndpointAccess, workgroup *redshiftserverless.Workgroup, tags []*redshiftserverless.Tag) (types.Database, error) {
+func NewDatabaseFromRedshiftServerlessVPCEndpoint(endpoint *redshiftserverless.EndpointAccess, workgroup *redshiftserverless.Workgroup, tags []*redshiftserverless.Tag, role AssumeRole) (types.Database, error) {
 	if workgroup.Endpoint == nil {
 		return nil, trace.BadParameter("missing endpoint")
 	}
 
-	metadata, err := MetadataFromRedshiftServerlessVPCEndpoint(endpoint, workgroup)
+	metadata, err := MetadataFromRedshiftServerlessVPCEndpoint(endpoint, workgroup, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -838,7 +856,7 @@ func NewDatabaseFromRedshiftServerlessVPCEndpoint(endpoint *redshiftserverless.E
 }
 
 // MetadataFromRDSInstance creates AWS metadata from the provided RDS instance.
-func MetadataFromRDSInstance(rdsInstance *rds.DBInstance) (*types.AWS, error) {
+func MetadataFromRDSInstance(rdsInstance *rds.DBInstance, role AssumeRole) (*types.AWS, error) {
 	parsedARN, err := arn.Parse(aws.StringValue(rdsInstance.DBInstanceArn))
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -852,11 +870,13 @@ func MetadataFromRDSInstance(rdsInstance *rds.DBInstance) (*types.AWS, error) {
 			ResourceID: aws.StringValue(rdsInstance.DbiResourceId),
 			IAMAuth:    aws.BoolValue(rdsInstance.IAMDatabaseAuthenticationEnabled),
 		},
+		AssumeRoleARN: role.RoleARN,
+		ExternalID:    role.ExternalID,
 	}, nil
 }
 
 // MetadataFromRDSCluster creates AWS metadata from the provided RDS cluster.
-func MetadataFromRDSCluster(rdsCluster *rds.DBCluster) (*types.AWS, error) {
+func MetadataFromRDSCluster(rdsCluster *rds.DBCluster, role AssumeRole) (*types.AWS, error) {
 	parsedARN, err := arn.Parse(aws.StringValue(rdsCluster.DBClusterArn))
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -869,11 +889,13 @@ func MetadataFromRDSCluster(rdsCluster *rds.DBCluster) (*types.AWS, error) {
 			ResourceID: aws.StringValue(rdsCluster.DbClusterResourceId),
 			IAMAuth:    aws.BoolValue(rdsCluster.IAMDatabaseAuthenticationEnabled),
 		},
+		AssumeRoleARN: role.RoleARN,
+		ExternalID:    role.ExternalID,
 	}, nil
 }
 
 // MetadataFromRDSProxy creates AWS metadata from the provided RDS Proxy.
-func MetadataFromRDSProxy(rdsProxy *rds.DBProxy) (*types.AWS, error) {
+func MetadataFromRDSProxy(rdsProxy *rds.DBProxy, role AssumeRole) (*types.AWS, error) {
 	parsedARN, err := arn.Parse(aws.StringValue(rdsProxy.DBProxyArn))
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -898,15 +920,17 @@ func MetadataFromRDSProxy(rdsProxy *rds.DBProxy) (*types.AWS, error) {
 			Name:       aws.StringValue(rdsProxy.DBProxyName),
 			ResourceID: resourceID,
 		},
+		AssumeRoleARN: role.RoleARN,
+		ExternalID:    role.ExternalID,
 	}, nil
 }
 
 // MetadataFromRDSProxyCustomEndpoint creates AWS metadata from the provided
 // RDS Proxy custom endpoint.
-func MetadataFromRDSProxyCustomEndpoint(rdsProxy *rds.DBProxy, customEndpoint *rds.DBProxyEndpoint) (*types.AWS, error) {
+func MetadataFromRDSProxyCustomEndpoint(rdsProxy *rds.DBProxy, customEndpoint *rds.DBProxyEndpoint, role AssumeRole) (*types.AWS, error) {
 	// Using resource ID from the default proxy for IAM policies to gain the
 	// RDS connection access.
-	metadata, err := MetadataFromRDSProxy(rdsProxy)
+	metadata, err := MetadataFromRDSProxy(rdsProxy, role)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -916,7 +940,7 @@ func MetadataFromRDSProxyCustomEndpoint(rdsProxy *rds.DBProxy, customEndpoint *r
 }
 
 // MetadataFromRedshiftCluster creates AWS metadata from the provided Redshift cluster.
-func MetadataFromRedshiftCluster(cluster *redshift.Cluster) (*types.AWS, error) {
+func MetadataFromRedshiftCluster(cluster *redshift.Cluster, role AssumeRole) (*types.AWS, error) {
 	parsedARN, err := arn.Parse(aws.StringValue(cluster.ClusterNamespaceArn))
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -927,12 +951,14 @@ func MetadataFromRedshiftCluster(cluster *redshift.Cluster) (*types.AWS, error) 
 		Redshift: types.Redshift{
 			ClusterID: aws.StringValue(cluster.ClusterIdentifier),
 		},
+		AssumeRoleARN: role.RoleARN,
+		ExternalID:    role.ExternalID,
 	}, nil
 }
 
 // MetadataFromElastiCacheCluster creates AWS metadata for the provided
 // ElastiCache cluster.
-func MetadataFromElastiCacheCluster(cluster *elasticache.ReplicationGroup, endpointType string) (*types.AWS, error) {
+func MetadataFromElastiCacheCluster(cluster *elasticache.ReplicationGroup, endpointType string, role AssumeRole) (*types.AWS, error) {
 	parsedARN, err := arn.Parse(aws.StringValue(cluster.ARN))
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -947,12 +973,14 @@ func MetadataFromElastiCacheCluster(cluster *elasticache.ReplicationGroup, endpo
 			TransitEncryptionEnabled: aws.BoolValue(cluster.TransitEncryptionEnabled),
 			EndpointType:             endpointType,
 		},
+		AssumeRoleARN: role.RoleARN,
+		ExternalID:    role.ExternalID,
 	}, nil
 }
 
 // MetadataFromMemoryDBCluster creates AWS metadata for the provided MemoryDB
 // cluster.
-func MetadataFromMemoryDBCluster(cluster *memorydb.Cluster, endpointType string) (*types.AWS, error) {
+func MetadataFromMemoryDBCluster(cluster *memorydb.Cluster, endpointType string, role AssumeRole) (*types.AWS, error) {
 	parsedARN, err := arn.Parse(aws.StringValue(cluster.ARN))
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -967,12 +995,14 @@ func MetadataFromMemoryDBCluster(cluster *memorydb.Cluster, endpointType string)
 			TLSEnabled:   aws.BoolValue(cluster.TLSEnabled),
 			EndpointType: endpointType,
 		},
+		AssumeRoleARN: role.RoleARN,
+		ExternalID:    role.ExternalID,
 	}, nil
 }
 
 // MetadataFromRedshiftServerlessWorkgroup creates AWS metadata for the
 // provided Redshift Serverless Workgroup.
-func MetadataFromRedshiftServerlessWorkgroup(workgroup *redshiftserverless.Workgroup) (*types.AWS, error) {
+func MetadataFromRedshiftServerlessWorkgroup(workgroup *redshiftserverless.Workgroup, role AssumeRole) (*types.AWS, error) {
 	parsedARN, err := arn.Parse(aws.StringValue(workgroup.WorkgroupArn))
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -985,12 +1015,14 @@ func MetadataFromRedshiftServerlessWorkgroup(workgroup *redshiftserverless.Workg
 			WorkgroupName: aws.StringValue(workgroup.WorkgroupName),
 			WorkgroupID:   aws.StringValue(workgroup.WorkgroupId),
 		},
+		AssumeRoleARN: role.RoleARN,
+		ExternalID:    role.ExternalID,
 	}, nil
 }
 
 // MetadataFromRedshiftServerlessVPCEndpoint creates AWS metadata for the
 // provided Redshift Serverless VPC endpoint.
-func MetadataFromRedshiftServerlessVPCEndpoint(endpoint *redshiftserverless.EndpointAccess, workgroup *redshiftserverless.Workgroup) (*types.AWS, error) {
+func MetadataFromRedshiftServerlessVPCEndpoint(endpoint *redshiftserverless.EndpointAccess, workgroup *redshiftserverless.Workgroup, role AssumeRole) (*types.AWS, error) {
 	parsedARN, err := arn.Parse(aws.StringValue(endpoint.EndpointArn))
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -1004,6 +1036,8 @@ func MetadataFromRedshiftServerlessVPCEndpoint(endpoint *redshiftserverless.Endp
 			EndpointName:  aws.StringValue(endpoint.EndpointName),
 			WorkgroupID:   aws.StringValue(workgroup.WorkgroupId),
 		},
+		AssumeRoleARN: role.RoleARN,
+		ExternalID:    role.ExternalID,
 	}, nil
 }
 

@@ -67,7 +67,7 @@ func (i identityBase) GetName() string {
 	// EC2 instances running on AWS with attached IAM role will have
 	// assumed-role identity with ARN like:
 	// arn:aws:sts::1234567890:assumed-role/DatabaseAccess/i-1234567890
-	if parts[0] == "assumed-role" && len(parts) > 2 {
+	if parts[0] == "assumed-role" && len(parts) > 1 {
 		return parts[1]
 	}
 	// Resource can include a path and the name is its last component e.g.

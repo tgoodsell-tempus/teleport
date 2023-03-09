@@ -241,10 +241,10 @@ func filterHeaders(r *http.Request, headers []string) []string {
 // FilterAWSRoles returns role ARNs from the provided list that belong to the
 // specified AWS account ID.
 //
-// If AWS account ID is empty, all roles are returned.
+// If AWS account ID is empty, all valid AWS IAM roles are returned.
 func FilterAWSRoles(arns []string, accountID string) (result Roles) {
 	for _, roleARN := range arns {
-		parsed, err := arn.Parse(roleARN)
+		parsed, err := ParseRoleARN(roleARN)
 		if err != nil || (accountID != "" && parsed.AccountID != accountID) {
 			continue
 		}
@@ -257,9 +257,6 @@ func FilterAWSRoles(arns []string, accountID string) (result Roles) {
 		// arn:aws:iam::1234567890:role/path/to/customrole (display: customrole)
 		parts := strings.Split(parsed.Resource, "/")
 		numParts := len(parts)
-		if numParts < 2 || parts[0] != "role" {
-			continue
-		}
 		result = append(result, Role{
 			Name:    strings.Join(parts[1:], "/"),
 			Display: parts[numParts-1],
@@ -348,37 +345,77 @@ func isJSON(contentType string) bool {
 }
 
 // BuildRoleARN constructs a string AWS ARN from a username, region, and account ID.
-func BuildRoleARN(username, region, accountID string) string {
+func BuildRoleARN(username, region, accountID string) (string, error) {
+	partition := apiawsutils.GetPartitionFromRegion(region)
 	if arn.IsARN(username) {
-		return username
+		// sanity check the given username role ARN.
+		parsed, err := ParseRoleARN(username)
+		if err != nil {
+			return "", trace.Wrap(err)
+		}
+		// don't check check for empty accountID - callers do not always pass an account ID,
+		// and it's only absolutely required if we need to build the role ARN below.
+		if err := CheckARNPartitionAndAccount(parsed, partition, accountID); err != nil {
+			return "", trace.Wrap(err)
+		}
+		return username, nil
+	}
+	if accountID == "" {
+		return "", trace.BadParameter("cannot build AWS IAM role ARN because AWS account ID is not specified")
 	}
 	resource := username
 	if !strings.Contains(resource, "/") {
 		resource = fmt.Sprintf("role/%s", username)
 	}
 	return arn.ARN{
-		Partition: apiawsutils.GetPartitionFromRegion(region),
+		Partition: partition,
 		Service:   iam.ServiceName,
 		AccountID: accountID,
 		Resource:  resource,
-	}.String()
+	}.String(), nil
 }
 
 // ValidateRoleARNAndExtractRoleName validates the role ARN and extracts the
 // short role name from it.
 func ValidateRoleARNAndExtractRoleName(roleARN, wantPartition, wantAccountID string) (string, error) {
-	role, err := arn.Parse(roleARN)
+	role, err := ParseRoleARN(roleARN)
 	if err != nil {
 		return "", trace.Wrap(err)
 	}
-	if !strings.HasPrefix(role.Resource, "role/") || role.Service != iam.ServiceName {
-		return "", trace.BadParameter("%q is not an IAM role", roleARN)
-	}
-	if role.Partition != wantPartition {
-		return "", trace.BadParameter("expecting AWS partition %q but got %q", wantPartition, role.Partition)
-	}
-	if role.AccountID != wantAccountID {
-		return "", trace.BadParameter("expecting AWS account ID %q but got %q", wantAccountID, role.AccountID)
+	if err := CheckARNPartitionAndAccount(role, wantPartition, wantAccountID); err != nil {
+		return "", trace.Wrap(err)
 	}
 	return strings.TrimPrefix(role.Resource, "role/"), nil
+}
+
+// ParseRoleARN parses an AWS ARN and checks that the ARN is
+// for an IAM Role resource.
+func ParseRoleARN(roleARN string) (*arn.ARN, error) {
+	role, err := arn.Parse(roleARN)
+	if err != nil {
+		return nil, trace.Wrap(err, "%q is not a valid AWS IAM role ARN", roleARN)
+	}
+	if !IsRoleARN(&role) {
+		return nil, trace.BadParameter("%q is not an AWS IAM role ARN", roleARN)
+	}
+	return &role, nil
+}
+
+// IsRoleARN returns whether a parsed ARN is for an IAM Role resource.
+// Example role ARN: arn:aws:iam::123456789012:role/some-role-name
+func IsRoleARN(parsed *arn.ARN) bool {
+	parts := strings.Split(parsed.Resource, "/")
+	return len(parts) >= 2 && parts[0] == "role" && parsed.Service == "iam"
+}
+
+// CheckARNPartitionAndAccount checks an AWS ARN against an expected AWS partition and account ID.
+// An empty expected AWS partition or account ID is not checked.
+func CheckARNPartitionAndAccount(ARN *arn.ARN, wantPartition, wantAccountID string) error {
+	if ARN.Partition != wantPartition && wantPartition != "" {
+		return trace.BadParameter("expected AWS partition %q but got %q", wantPartition, ARN.Partition)
+	}
+	if ARN.AccountID != wantAccountID && wantAccountID != "" {
+		return trace.BadParameter("expected AWS account ID %q but got %q", wantAccountID, ARN.AccountID)
+	}
+	return nil
 }

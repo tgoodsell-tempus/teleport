@@ -136,7 +136,7 @@ func getAWSCredentials(ctx context.Context, cloudClients cloud.Clients, cluster 
 // getAWSClientRestConfig creates a dynamicCredsClient that generates returns credentials to EKS clusters.
 func getAWSClientRestConfig(cloudClients cloud.Clients) dynamicCredsClient {
 	return func(ctx context.Context, cluster types.KubeCluster) (*rest.Config, time.Time, error) {
-		regionalClient, err := cloudClients.GetAWSEKSClient(cluster.GetAWSConfig().Region)
+		regionalClient, err := cloudClients.GetAWSEKSClient(ctx, cluster.GetAWSConfig().Region)
 		if err != nil {
 			return nil, time.Time{}, trace.Wrap(err)
 		}
@@ -158,7 +158,7 @@ func getAWSClientRestConfig(cloudClients cloud.Clients) dynamicCredsClient {
 			return nil, time.Time{}, trace.BadParameter("invalid api endpoint for cluster %q", cluster.GetAWSConfig().Name)
 		}
 
-		stsClient, err := cloudClients.GetAWSSTSClient(cluster.GetAWSConfig().Region)
+		stsClient, err := cloudClients.GetAWSSTSClient(ctx, cluster.GetAWSConfig().Region)
 		if err != nil {
 			return nil, time.Time{}, trace.Wrap(err)
 		}
