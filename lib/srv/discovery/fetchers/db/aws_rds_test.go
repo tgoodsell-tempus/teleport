@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/rds"
 	"github.com/aws/aws-sdk-go/service/rds/rdsiface"
 	"github.com/google/uuid"
@@ -57,7 +59,7 @@ func TestRDSFetchers(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		inputClients  cloud.AWSClients
+		inputClients  *cloud.TestCloudClients
 		inputMatchers []services.AWSMatcher
 		wantDatabases types.Databases
 	}{
@@ -130,6 +132,7 @@ func TestRDSFetchers(t *testing.T) {
 		{
 			name: "skip unrecognized engines",
 			inputClients: &cloud.TestCloudClients{
+				AWSSessions: nil,
 				RDSPerRegion: map[string]rdsiface.RDSAPI{
 					"us-east-1": &mocks.RDSMock{
 						DBInstances:      []*rds.DBInstance{rdsInstance1, rdsInstance3},
@@ -212,6 +215,7 @@ func TestRDSFetchers(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
+			mustAddAssumedRolesAndMockSessionsForMatchers(t, test.inputMatchers, test.inputClients)
 			fetchers := mustMakeAWSFetchers(t, test.inputClients, test.inputMatchers)
 			require.ElementsMatch(t, test.wantDatabases, mustGetDatabases(t, fetchers))
 		})
@@ -235,7 +239,7 @@ func makeRDSInstance(t *testing.T, name, region string, labels map[string]string
 		opt(instance)
 	}
 
-	database, err := services.NewDatabaseFromRDSInstance(instance)
+	database, err := services.NewDatabaseFromRDSInstance(instance, testAssumeRole)
 	require.NoError(t, err)
 	return instance, database
 }
@@ -259,7 +263,7 @@ func makeRDSCluster(t *testing.T, name, region string, labels map[string]string,
 		opt(cluster)
 	}
 
-	database, err := services.NewDatabaseFromRDSCluster(cluster)
+	database, err := services.NewDatabaseFromRDSCluster(cluster, testAssumeRole)
 	require.NoError(t, err)
 	return cluster, database
 }
@@ -292,16 +296,16 @@ func makeRDSClusterWithExtraEndpoints(t *testing.T, name, region string, labels 
 			IsClusterWriter: aws.Bool(true), // Add writer.
 		})
 
-		primaryDatabase, err := services.NewDatabaseFromRDSCluster(cluster)
+		primaryDatabase, err := services.NewDatabaseFromRDSCluster(cluster, testAssumeRole)
 		require.NoError(t, err)
 		databases = append(databases, primaryDatabase)
 	}
 
-	readerDatabase, err := services.NewDatabaseFromRDSClusterReaderEndpoint(cluster)
+	readerDatabase, err := services.NewDatabaseFromRDSClusterReaderEndpoint(cluster, testAssumeRole)
 	require.NoError(t, err)
 	databases = append(databases, readerDatabase)
 
-	customDatabases, err := services.NewDatabasesFromRDSClusterCustomEndpoints(cluster)
+	customDatabases, err := services.NewDatabasesFromRDSClusterCustomEndpoints(cluster, testAssumeRole)
 	require.NoError(t, err)
 	databases = append(databases, customDatabases...)
 
@@ -327,4 +331,38 @@ func withRDSClusterStatus(status string) func(*rds.DBCluster) {
 	return func(cluster *rds.DBCluster) {
 		cluster.Status = aws.String(status)
 	}
+}
+
+// mustAddAssumedRolesAndMockSessionsForMatchers injects a test assume role and injects
+// mock AWS sessions for the assumed role into test cloud clients.
+func mustAddAssumedRolesAndMockSessionsForMatchers(t *testing.T, matchers []services.AWSMatcher, clients *cloud.TestCloudClients) {
+	t.Helper()
+	// configure all the test matchers to have an assumed role and inject mock AWS sessions into cloud clients for them.
+	awsSessions := make(map[string]*session.Session)
+	for i := range matchers {
+		matchers[i].AssumeRole = testAssumeRole
+		for _, region := range matchers[i].Regions {
+			cacheKey, session := makeAWSSession(t, region, testAssumeRole)
+			awsSessions[cacheKey] = session
+		}
+	}
+	clients.AWSSessions = awsSessions
+}
+
+// makeAWSSession is a test helper to build a mock cached aws session for a given assume role chain.
+func makeAWSSession(t *testing.T, region string, roles ...services.AssumeRole) (string, *session.Session) {
+	t.Helper()
+	awsSession, err := session.NewSession(&aws.Config{
+		Credentials: credentials.NewCredentials(&credentials.StaticProvider{Value: credentials.Value{
+			AccessKeyID:     "fakeClientKeyID",
+			SecretAccessKey: "fakeClientSecret",
+		}}),
+		Region: aws.String(region),
+	})
+	require.NoError(t, err)
+	keyBuilder := cloud.NewAWSSessionCacheKeyBuilder(region)
+	for i := range roles {
+		keyBuilder.AddRole(roles[i])
+	}
+	return keyBuilder.String(), awsSession
 }

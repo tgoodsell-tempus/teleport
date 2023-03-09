@@ -56,6 +56,7 @@ func TestGetIdentity(t *testing.T) {
 			outPartition: "aws",
 			outType:      "assumed-role",
 		},
+		// TODO(gavin): add test where we have no session name for assumed-role
 		{
 			description:  "user identity",
 			inARN:        "arn:aws-us-gov:iam::123456789012:user/custom/path/alice",

@@ -35,6 +35,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/rds"
 	"github.com/aws/aws-sdk-go/service/redshift"
 	"github.com/aws/aws-sdk-go/service/redshiftserverless"
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 	"github.com/gravitational/trace"
 	"github.com/stretchr/testify/require"
@@ -66,7 +67,7 @@ func TestDatabaseUnmarshal(t *testing.T) {
 	require.NoError(t, err)
 	actual, err := UnmarshalDatabase(data)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 // TestDatabaseMarshal verifies a marshaled database resource can be unmarshaled back.
@@ -85,7 +86,7 @@ func TestDatabaseMarshal(t *testing.T) {
 	require.NoError(t, err)
 	actual, err := UnmarshalDatabase(data)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 func TestValidateDatabase(t *testing.T) {
@@ -122,6 +123,42 @@ func TestValidateDatabase(t *testing.T) {
 			inputSpec: types.DatabaseSpecV3{
 				Protocol: defaults.ProtocolPostgres,
 				URI:      "missing-port",
+			},
+			expectError: true,
+		},
+		{
+			inputName: "invalid-database-assume-role-arn",
+			inputSpec: types.DatabaseSpecV3{
+				Protocol: defaults.ProtocolDynamoDB,
+				AWS: types.AWS{
+					Region:        "us-east-1",
+					AccountID:     "123456789012",
+					AssumeRoleARN: "foobar",
+				},
+			},
+			expectError: true,
+		},
+		{
+			inputName: "invalid-database-assume-role-arn-resource-type",
+			inputSpec: types.DatabaseSpecV3{
+				Protocol: defaults.ProtocolDynamoDB,
+				AWS: types.AWS{
+					Region:        "us-east-1",
+					AccountID:     "123456789012",
+					AssumeRoleARN: "arn:aws:sts::123456789012:federated-user/Alice",
+				},
+			},
+			expectError: true,
+		},
+		{
+			inputName: "invalid-database-assume-role-arn-account-id-mismatch",
+			inputSpec: types.DatabaseSpecV3{
+				Protocol: defaults.ProtocolDynamoDB,
+				AWS: types.AWS{
+					Region:        "us-east-1",
+					AccountID:     "123456789012",
+					AssumeRoleARN: "arn:aws:iam::111222333444:federated-user/Alice",
+				},
 			},
 			expectError: true,
 		},
@@ -217,7 +254,7 @@ func TestValidateDatabase(t *testing.T) {
 				Protocol: defaults.ProtocolDynamoDB,
 				AWS: types.AWS{
 					Region:    "us-east-1",
-					AccountID: "1234567890",
+					AccountID: "123456789012",
 				},
 			},
 			expectError: false,
@@ -318,7 +355,7 @@ func TestDatabaseFromAzureDBServer(t *testing.T) {
 
 	actual, err := NewDatabaseFromAzureServer(&server)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 func TestDatabaseFromAzureRedis(t *testing.T) {
@@ -366,7 +403,7 @@ func TestDatabaseFromAzureRedis(t *testing.T) {
 
 	actual, err := NewDatabaseFromAzureRedis(resourceInfo)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 func TestDatabaseFromAzureRedisEnterprise(t *testing.T) {
@@ -428,7 +465,7 @@ func TestDatabaseFromAzureRedisEnterprise(t *testing.T) {
 
 	actual, err := NewDatabaseFromAzureRedisEnterprise(armCluster, armDatabase)
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 // TestDatabaseFromRDSInstance tests converting an RDS instance to a database resource.
@@ -466,8 +503,10 @@ func TestDatabaseFromRDSInstance(t *testing.T) {
 		Protocol: defaults.ProtocolPostgres,
 		URI:      "localhost:5432",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "us-west-1",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "us-west-1",
 			RDS: types.RDS{
 				InstanceID: "instance-1",
 				ClusterID:  "cluster-1",
@@ -477,9 +516,13 @@ func TestDatabaseFromRDSInstance(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	actual, err := NewDatabaseFromRDSInstance(instance)
+	// TODO(gavin): everywhere we test creating a db from something, pass assume role just to verify it populates metadata.
+	actual, err := NewDatabaseFromRDSInstance(instance, AssumeRole{
+		RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID: "externalid123",
+	})
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 // TestDatabaseFromRDSInstance tests converting an RDS instance to a database resource.
@@ -518,8 +561,10 @@ func TestDatabaseFromRDSInstanceNameOverride(t *testing.T) {
 		Protocol: defaults.ProtocolPostgres,
 		URI:      "localhost:5432",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "us-west-1",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "us-west-1",
 			RDS: types.RDS{
 				InstanceID: "instance-1",
 				ClusterID:  "cluster-1",
@@ -529,9 +574,12 @@ func TestDatabaseFromRDSInstanceNameOverride(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	actual, err := NewDatabaseFromRDSInstance(instance)
+	actual, err := NewDatabaseFromRDSInstance(instance, AssumeRole{
+		RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID: "externalid123",
+	})
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 // TestDatabaseFromRDSCluster tests converting an RDS cluster to a database resource.
@@ -557,8 +605,10 @@ func TestDatabaseFromRDSCluster(t *testing.T) {
 	}
 
 	expectedAWS := types.AWS{
-		AccountID: "123456789012",
-		Region:    "us-east-1",
+		AccountID:     "123456789012",
+		AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID:    "externalid123",
+		Region:        "us-east-1",
 		RDS: types.RDS{
 			ClusterID:  "cluster-1",
 			ResourceID: "resource-1",
@@ -585,9 +635,12 @@ func TestDatabaseFromRDSCluster(t *testing.T) {
 			AWS:      expectedAWS,
 		})
 		require.NoError(t, err)
-		actual, err := NewDatabaseFromRDSCluster(cluster)
+		actual, err := NewDatabaseFromRDSCluster(cluster, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
+		require.Empty(t, cmp.Diff(expected, actual))
 	})
 
 	t.Run("reader", func(t *testing.T) {
@@ -609,9 +662,12 @@ func TestDatabaseFromRDSCluster(t *testing.T) {
 			AWS:      expectedAWS,
 		})
 		require.NoError(t, err)
-		actual, err := NewDatabaseFromRDSClusterReaderEndpoint(cluster)
+		actual, err := NewDatabaseFromRDSClusterReaderEndpoint(cluster, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
+		require.Empty(t, cmp.Diff(expected, actual))
 	})
 
 	t.Run("custom endpoints", func(t *testing.T) {
@@ -653,7 +709,10 @@ func TestDatabaseFromRDSCluster(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		databases, err := NewDatabasesFromRDSClusterCustomEndpoints(cluster)
+		databases, err := NewDatabasesFromRDSClusterCustomEndpoints(cluster, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.NoError(t, err)
 		require.Equal(t, types.Databases{expectedMyEndpoint1, expectedMyEndpoint2}, databases)
 	})
@@ -664,7 +723,10 @@ func TestDatabaseFromRDSCluster(t *testing.T) {
 			aws.String("badendpoint1"),
 			aws.String("badendpoint2"),
 		}
-		_, err := NewDatabasesFromRDSClusterCustomEndpoints(&badCluster)
+		_, err := NewDatabasesFromRDSClusterCustomEndpoints(&badCluster, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.Error(t, err)
 	})
 }
@@ -692,8 +754,10 @@ func TestDatabaseFromRDSClusterNameOverride(t *testing.T) {
 	}
 
 	expectedAWS := types.AWS{
-		AccountID: "123456789012",
-		Region:    "us-east-1",
+		AccountID:     "123456789012",
+		AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID:    "externalid123",
+		Region:        "us-east-1",
 		RDS: types.RDS{
 			ClusterID:  "cluster-1",
 			ResourceID: "resource-1",
@@ -721,9 +785,12 @@ func TestDatabaseFromRDSClusterNameOverride(t *testing.T) {
 			AWS:      expectedAWS,
 		})
 		require.NoError(t, err)
-		actual, err := NewDatabaseFromRDSCluster(cluster)
+		actual, err := NewDatabaseFromRDSCluster(cluster, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
+		require.Empty(t, cmp.Diff(expected, actual))
 	})
 
 	t.Run("reader", func(t *testing.T) {
@@ -746,9 +813,12 @@ func TestDatabaseFromRDSClusterNameOverride(t *testing.T) {
 			AWS:      expectedAWS,
 		})
 		require.NoError(t, err)
-		actual, err := NewDatabaseFromRDSClusterReaderEndpoint(cluster)
+		actual, err := NewDatabaseFromRDSClusterReaderEndpoint(cluster, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
+		require.Empty(t, cmp.Diff(expected, actual))
 	})
 
 	t.Run("custom endpoints", func(t *testing.T) {
@@ -791,7 +861,10 @@ func TestDatabaseFromRDSClusterNameOverride(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		databases, err := NewDatabasesFromRDSClusterCustomEndpoints(cluster)
+		databases, err := NewDatabasesFromRDSClusterCustomEndpoints(cluster, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.NoError(t, err)
 		require.Equal(t, types.Databases{expectedMyEndpoint1, expectedMyEndpoint2}, databases)
 	})
@@ -802,7 +875,10 @@ func TestDatabaseFromRDSClusterNameOverride(t *testing.T) {
 			aws.String("badendpoint1"),
 			aws.String("badendpoint2"),
 		}
-		_, err := NewDatabasesFromRDSClusterCustomEndpoints(&badCluster)
+		_, err := NewDatabasesFromRDSClusterCustomEndpoints(&badCluster, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.Error(t, err)
 	})
 }
@@ -846,8 +922,10 @@ func TestDatabaseFromRDSProxy(t *testing.T) {
 			Protocol: defaults.ProtocolMySQL,
 			URI:      "proxy.rds.test:9999",
 			AWS: types.AWS{
-				Region:    "ca-central-1",
-				AccountID: "123456789012",
+				Region:        "ca-central-1",
+				AccountID:     "123456789012",
+				AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+				ExternalID:    "externalid123",
 				RDSProxy: types.RDSProxy{
 					ResourceID: "prx-abcdef",
 					Name:       "testproxy",
@@ -856,9 +934,12 @@ func TestDatabaseFromRDSProxy(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		actual, err := NewDatabaseFromRDSProxy(dbProxy, port, tags)
+		actual, err := NewDatabaseFromRDSProxy(dbProxy, port, tags, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
+		require.Empty(t, cmp.Diff(expected, actual))
 	})
 
 	t.Run("custom endpoint", func(t *testing.T) {
@@ -878,8 +959,10 @@ func TestDatabaseFromRDSProxy(t *testing.T) {
 			Protocol: defaults.ProtocolMySQL,
 			URI:      "custom.proxy.rds.test:9999",
 			AWS: types.AWS{
-				Region:    "ca-central-1",
-				AccountID: "123456789012",
+				Region:        "ca-central-1",
+				AccountID:     "123456789012",
+				AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+				ExternalID:    "externalid123",
 				RDSProxy: types.RDSProxy{
 					ResourceID:         "prx-abcdef",
 					Name:               "testproxy",
@@ -892,9 +975,12 @@ func TestDatabaseFromRDSProxy(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		actual, err := NewDatabaseFromRDSProxyCustomEndpoint(dbProxy, dbProxyEndpoint, port, tags)
+		actual, err := NewDatabaseFromRDSProxyCustomEndpoint(dbProxy, dbProxyEndpoint, port, tags, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
+		require.Empty(t, cmp.Diff(expected, actual))
 	})
 }
 
@@ -1068,8 +1154,10 @@ func TestDatabaseFromRedshiftCluster(t *testing.T) {
 			Protocol: defaults.ProtocolPostgres,
 			URI:      "localhost:5439",
 			AWS: types.AWS{
-				AccountID: "123456789012",
-				Region:    "us-east-1",
+				AccountID:     "123456789012",
+				AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+				ExternalID:    "externalid123",
+				Region:        "us-east-1",
 				Redshift: types.Redshift{
 					ClusterID: "mycluster",
 				},
@@ -1078,9 +1166,12 @@ func TestDatabaseFromRedshiftCluster(t *testing.T) {
 
 		require.NoError(t, err)
 
-		actual, err := NewDatabaseFromRedshiftCluster(cluster)
+		actual, err := NewDatabaseFromRedshiftCluster(cluster, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
+		require.Empty(t, cmp.Diff(expected, actual))
 	})
 
 	t.Run("success with name override", func(t *testing.T) {
@@ -1121,8 +1212,10 @@ func TestDatabaseFromRedshiftCluster(t *testing.T) {
 			Protocol: defaults.ProtocolPostgres,
 			URI:      "localhost:5439",
 			AWS: types.AWS{
-				AccountID: "123456789012",
-				Region:    "us-east-1",
+				AccountID:     "123456789012",
+				AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+				ExternalID:    "externalid123",
+				Region:        "us-east-1",
 				Redshift: types.Redshift{
 					ClusterID: "mycluster",
 				},
@@ -1131,14 +1224,20 @@ func TestDatabaseFromRedshiftCluster(t *testing.T) {
 
 		require.NoError(t, err)
 
-		actual, err := NewDatabaseFromRedshiftCluster(cluster)
+		actual, err := NewDatabaseFromRedshiftCluster(cluster, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
+		})
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
+		require.Empty(t, cmp.Diff(expected, actual))
 	})
 
 	t.Run("missing endpoint", func(t *testing.T) {
 		_, err := NewDatabaseFromRedshiftCluster(&redshift.Cluster{
 			ClusterIdentifier: aws.String("still-creating"),
+		}, AssumeRole{
+			RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID: "externalid123",
 		})
 		require.Error(t, err)
 		require.True(t, trace.IsBadParameter(err), "Expected trace.BadParameter, got %v", err)
@@ -1198,8 +1297,10 @@ func TestDatabaseFromElastiCacheConfigurationEndpoint(t *testing.T) {
 		Protocol: defaults.ProtocolRedis,
 		URI:      "configuration.localhost:6379",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "us-east-1",
 			ElastiCache: types.ElastiCache{
 				ReplicationGroupID:       "my-cluster",
 				UserGroupIDs:             []string{"my-user-group"},
@@ -1210,9 +1311,12 @@ func TestDatabaseFromElastiCacheConfigurationEndpoint(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	actual, err := NewDatabaseFromElastiCacheConfigurationEndpoint(cluster, extraLabels)
+	actual, err := NewDatabaseFromElastiCacheConfigurationEndpoint(cluster, extraLabels, AssumeRole{
+		RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID: "externalid123",
+	})
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 func TestDatabaseFromElastiCacheConfigurationEndpointNameOverride(t *testing.T) {
@@ -1272,8 +1376,10 @@ func TestDatabaseFromElastiCacheConfigurationEndpointNameOverride(t *testing.T) 
 		Protocol: defaults.ProtocolRedis,
 		URI:      "configuration.localhost:6379",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "us-east-1",
 			ElastiCache: types.ElastiCache{
 				ReplicationGroupID:       "my-cluster",
 				UserGroupIDs:             []string{"my-user-group"},
@@ -1284,9 +1390,12 @@ func TestDatabaseFromElastiCacheConfigurationEndpointNameOverride(t *testing.T) 
 	})
 	require.NoError(t, err)
 
-	actual, err := NewDatabaseFromElastiCacheConfigurationEndpoint(cluster, extraLabels)
+	actual, err := NewDatabaseFromElastiCacheConfigurationEndpoint(cluster, extraLabels, AssumeRole{
+		RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID: "externalid123",
+	})
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 func TestDatabaseFromElastiCacheNodeGroups(t *testing.T) {
@@ -1327,8 +1436,10 @@ func TestDatabaseFromElastiCacheNodeGroups(t *testing.T) {
 		Protocol: defaults.ProtocolRedis,
 		URI:      "primary.localhost:6379",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "us-east-1",
 			ElastiCache: types.ElastiCache{
 				ReplicationGroupID:       "my-cluster",
 				UserGroupIDs:             []string{"my-user-group"},
@@ -1353,8 +1464,10 @@ func TestDatabaseFromElastiCacheNodeGroups(t *testing.T) {
 		Protocol: defaults.ProtocolRedis,
 		URI:      "reader.localhost:6379",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "us-east-1",
 			ElastiCache: types.ElastiCache{
 				ReplicationGroupID:       "my-cluster",
 				UserGroupIDs:             []string{"my-user-group"},
@@ -1365,7 +1478,10 @@ func TestDatabaseFromElastiCacheNodeGroups(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	actual, err := NewDatabasesFromElastiCacheNodeGroups(cluster, extraLabels)
+	actual, err := NewDatabasesFromElastiCacheNodeGroups(cluster, extraLabels, AssumeRole{
+		RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID: "externalid123",
+	})
 	require.NoError(t, err)
 	require.Equal(t, types.Databases{expectedPrimary, expectedReader}, actual)
 }
@@ -1412,8 +1528,10 @@ func TestDatabaseFromElastiCacheNodeGroupsNameOverride(t *testing.T) {
 		Protocol: defaults.ProtocolRedis,
 		URI:      "primary.localhost:6379",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "us-east-1",
 			ElastiCache: types.ElastiCache{
 				ReplicationGroupID:       "my-cluster",
 				UserGroupIDs:             []string{"my-user-group"},
@@ -1439,8 +1557,10 @@ func TestDatabaseFromElastiCacheNodeGroupsNameOverride(t *testing.T) {
 		Protocol: defaults.ProtocolRedis,
 		URI:      "reader.localhost:6379",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "us-east-1",
 			ElastiCache: types.ElastiCache{
 				ReplicationGroupID:       "my-cluster",
 				UserGroupIDs:             []string{"my-user-group"},
@@ -1451,7 +1571,10 @@ func TestDatabaseFromElastiCacheNodeGroupsNameOverride(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	actual, err := NewDatabasesFromElastiCacheNodeGroups(cluster, extraLabels)
+	actual, err := NewDatabasesFromElastiCacheNodeGroups(cluster, extraLabels, AssumeRole{
+		RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID: "externalid123",
+	})
 	require.NoError(t, err)
 	require.Equal(t, types.Databases{expectedPrimary, expectedReader}, actual)
 }
@@ -1484,8 +1607,10 @@ func TestDatabaseFromMemoryDBCluster(t *testing.T) {
 		Protocol: defaults.ProtocolRedis,
 		URI:      "memorydb.localhost:6379",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "us-east-1",
 			MemoryDB: types.MemoryDB{
 				ClusterName:  "my-cluster",
 				ACLName:      "my-user-group",
@@ -1496,9 +1621,12 @@ func TestDatabaseFromMemoryDBCluster(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	actual, err := NewDatabaseFromMemoryDBCluster(cluster, extraLabels)
+	actual, err := NewDatabaseFromMemoryDBCluster(cluster, extraLabels, AssumeRole{
+		RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID: "externalid123",
+	})
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 func TestDatabaseFromRedshiftServerlessWorkgroup(t *testing.T) {
@@ -1520,8 +1648,10 @@ func TestDatabaseFromRedshiftServerlessWorkgroup(t *testing.T) {
 		Protocol: defaults.ProtocolPostgres,
 		URI:      "my-workgroup.123456789012.eu-west-2.redshift-serverless.amazonaws.com:5439",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "eu-west-2",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "eu-west-2",
 			RedshiftServerless: types.RedshiftServerless{
 				WorkgroupName: "my-workgroup",
 				WorkgroupID:   "some-uuid-for-my-workgroup",
@@ -1530,9 +1660,12 @@ func TestDatabaseFromRedshiftServerlessWorkgroup(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	actual, err := NewDatabaseFromRedshiftServerlessWorkgroup(workgroup, tags)
+	actual, err := NewDatabaseFromRedshiftServerlessWorkgroup(workgroup, tags, AssumeRole{
+		RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID: "externalid123",
+	})
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 func TestDatabaseFromRedshiftServerlessVPCEndpoint(t *testing.T) {
@@ -1556,8 +1689,10 @@ func TestDatabaseFromRedshiftServerlessVPCEndpoint(t *testing.T) {
 		Protocol: defaults.ProtocolPostgres,
 		URI:      "my-endpoint-endpoint-xxxyyyzzz.123456789012.eu-west-2.redshift-serverless.amazonaws.com:5439",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "eu-west-2",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "eu-west-2",
 			RedshiftServerless: types.RedshiftServerless{
 				WorkgroupName: "my-workgroup",
 				EndpointName:  "my-endpoint",
@@ -1570,9 +1705,12 @@ func TestDatabaseFromRedshiftServerlessVPCEndpoint(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	actual, err := NewDatabaseFromRedshiftServerlessVPCEndpoint(endpoint, workgroup, tags)
+	actual, err := NewDatabaseFromRedshiftServerlessVPCEndpoint(endpoint, workgroup, tags, AssumeRole{
+		RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID: "externalid123",
+	})
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 func TestDatabaseFromMemoryDBClusterNameOverride(t *testing.T) {
@@ -1607,8 +1745,10 @@ func TestDatabaseFromMemoryDBClusterNameOverride(t *testing.T) {
 		Protocol: defaults.ProtocolRedis,
 		URI:      "memorydb.localhost:6379",
 		AWS: types.AWS{
-			AccountID: "123456789012",
-			Region:    "us-east-1",
+			AccountID:     "123456789012",
+			AssumeRoleARN: "arn:aws:iam::123456789012:role/DBDiscoverer",
+			ExternalID:    "externalid123",
+			Region:        "us-east-1",
 			MemoryDB: types.MemoryDB{
 				ClusterName:  "my-cluster",
 				ACLName:      "my-user-group",
@@ -1619,9 +1759,12 @@ func TestDatabaseFromMemoryDBClusterNameOverride(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	actual, err := NewDatabaseFromMemoryDBCluster(cluster, extraLabels)
+	actual, err := NewDatabaseFromMemoryDBCluster(cluster, extraLabels, AssumeRole{
+		RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
+		ExternalID: "externalid123",
+	})
 	require.NoError(t, err)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 func TestExtraElastiCacheLabels(t *testing.T) {
@@ -1750,7 +1893,7 @@ func TestExtraMemoryDBLabels(t *testing.T) {
 	}
 
 	actual := ExtraMemoryDBLabels(cluster, resourceTags, allSubnetGroups)
-	require.Equal(t, expected, actual)
+	require.Empty(t, cmp.Diff(expected, actual))
 }
 
 func TestGetLabelEngineVersion(t *testing.T) {

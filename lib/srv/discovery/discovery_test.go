@@ -1103,7 +1103,7 @@ func makeRedshiftCluster(t *testing.T, name, region string) (*redshift.Cluster, 
 		},
 	}
 
-	database, err := services.NewDatabaseFromRedshiftCluster(cluster)
+	database, err := services.NewDatabaseFromRedshiftCluster(cluster, services.AssumeRole{})
 	require.NoError(t, err)
 	database.SetOrigin(types.OriginCloud)
 	return cluster, database

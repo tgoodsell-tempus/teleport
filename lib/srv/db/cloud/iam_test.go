@@ -24,6 +24,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/rds"
 	"github.com/aws/aws-sdk-go/service/redshift"
@@ -124,9 +125,17 @@ func TestAWSIAM(t *testing.T) {
 			require.Fail(t, "Failed to wait for task is processed")
 		}
 	}
+	assumedRole := services.AssumeRole{
+		RoleARN:    "arn:aws:iam::123456789012:role/test-role",
+		ExternalID: "externalid123",
+	}
+	cacheKey, awsSession := makeAWSSession(t, "localhost", assumedRole)
 	configurator, err := NewIAM(ctx, IAMConfig{
 		AccessPoint: &mockAccessPoint{},
 		Clients: &clients.TestCloudClients{
+			AWSSessions: map[string]*session.Session{
+				cacheKey: awsSession,
+			},
 			RDS:      rdsClient,
 			Redshift: redshiftClient,
 			STS:      stsClient,
@@ -148,75 +157,77 @@ func TestAWSIAM(t *testing.T) {
 		PolicyName: aws.String(policyName),
 	}
 
-	t.Run("RDS", func(t *testing.T) {
-		// Configure RDS database and make sure IAM was enabled and policy was attached.
-		err = configurator.Setup(ctx, rdsDatabase)
-		require.NoError(t, err)
-		waitForTaskProcessed(t)
-		require.True(t, aws.BoolValue(rdsInstance.IAMDatabaseAuthenticationEnabled))
-		output, err := iamClient.GetRolePolicyWithContext(ctx, getRolePolicyInput)
-		require.NoError(t, err)
-		require.Contains(t, aws.StringValue(output.PolicyDocument), rdsDatabase.GetAWS().RDS.ResourceID)
+	tests := map[string]struct {
+		database           types.Database
+		wantPolicyContains string
+		getIAMAuthEnabled  func() bool
+	}{
+		"RDS": {
+			database:           rdsDatabase,
+			wantPolicyContains: rdsDatabase.GetAWS().RDS.ResourceID,
+			getIAMAuthEnabled: func() bool {
+				out := aws.BoolValue(rdsInstance.IAMDatabaseAuthenticationEnabled)
+				// reset it
+				rdsInstance.IAMDatabaseAuthenticationEnabled = aws.Bool(false)
+				return out
+			},
+		},
+		"Aurora": {
+			database:           auroraDatabase,
+			wantPolicyContains: auroraDatabase.GetAWS().RDS.ResourceID,
+			getIAMAuthEnabled: func() bool {
+				out := aws.BoolValue(auroraCluster.IAMDatabaseAuthenticationEnabled)
+				// reset it
+				auroraCluster.IAMDatabaseAuthenticationEnabled = aws.Bool(false)
+				return out
+			},
+		},
+		"RDS Proxy": {
+			database:           rdsProxy,
+			wantPolicyContains: rdsProxy.GetAWS().RDSProxy.ResourceID,
+			getIAMAuthEnabled: func() bool {
+				return true // it always is for rds proxy.
+			},
+		},
+		"Redshift": {
+			database:           redshiftDatabase,
+			wantPolicyContains: redshiftDatabase.GetAWS().Redshift.ClusterID,
+			getIAMAuthEnabled: func() bool {
+				return true // it always is for redshift.
+			},
+		},
+	}
 
-		// Deconfigure RDS database, policy should get detached.
-		err = configurator.Teardown(ctx, rdsDatabase)
-		require.NoError(t, err)
-		waitForTaskProcessed(t)
-		_, err = iamClient.GetRolePolicyWithContext(ctx, getRolePolicyInput)
-		require.True(t, trace.IsNotFound(err))
-	})
+	for name, tt := range tests {
+		meta := tt.database.GetAWS()
+		for _, assumeRole := range []services.AssumeRole{{}, assumedRole} {
+			testName := name
+			meta := meta
+			if assumeRole.RoleARN != "" {
+				testName += " with assumed role"
+				meta.AssumeRoleARN = assumeRole.RoleARN
+				meta.ExternalID = assumeRole.ExternalID
+			}
+			tt.database.SetStatusAWS(meta)
+			t.Run(testName, func(t *testing.T) {
+				// Configure database and make sure IAM is enabled and policy was attached.
+				err = configurator.Setup(ctx, tt.database)
+				require.NoError(t, err)
+				waitForTaskProcessed(t)
+				output, err := iamClient.GetRolePolicyWithContext(ctx, getRolePolicyInput)
+				require.NoError(t, err)
+				require.True(t, tt.getIAMAuthEnabled())
+				require.Contains(t, aws.StringValue(output.PolicyDocument), tt.wantPolicyContains)
 
-	t.Run("Aurora", func(t *testing.T) {
-		// Configure Aurora database and make sure IAM was enabled and policy was attached.
-		err = configurator.Setup(ctx, auroraDatabase)
-		require.NoError(t, err)
-		waitForTaskProcessed(t)
-		require.True(t, aws.BoolValue(auroraCluster.IAMDatabaseAuthenticationEnabled))
-		output, err := iamClient.GetRolePolicyWithContext(ctx, getRolePolicyInput)
-		require.NoError(t, err)
-		require.Contains(t, aws.StringValue(output.PolicyDocument), auroraDatabase.GetAWS().RDS.ResourceID)
-
-		// Deconfigure Aurora database, policy should get detached.
-		err = configurator.Teardown(ctx, auroraDatabase)
-		require.NoError(t, err)
-		waitForTaskProcessed(t)
-		_, err = iamClient.GetRolePolicyWithContext(ctx, getRolePolicyInput)
-		require.True(t, trace.IsNotFound(err))
-	})
-
-	t.Run("RDS Proxy", func(t *testing.T) {
-		// Configure RDS Proxy database and make sure IAM was enabled and policy was attached.
-		err = configurator.Setup(ctx, rdsProxy)
-		require.NoError(t, err)
-		waitForTaskProcessed(t)
-		output, err := iamClient.GetRolePolicyWithContext(ctx, getRolePolicyInput)
-		require.NoError(t, err)
-		require.Contains(t, aws.StringValue(output.PolicyDocument), rdsProxy.GetAWS().RDSProxy.ResourceID)
-
-		// Deconfigure RDS Proxy database, policy should get detached.
-		err = configurator.Teardown(ctx, rdsProxy)
-		require.NoError(t, err)
-		waitForTaskProcessed(t)
-		_, err = iamClient.GetRolePolicyWithContext(ctx, getRolePolicyInput)
-		require.True(t, trace.IsNotFound(err))
-	})
-
-	t.Run("Redshift", func(t *testing.T) {
-		// Configure Redshift database and make sure policy was attached.
-		err = configurator.Setup(ctx, redshiftDatabase)
-		require.NoError(t, err)
-		waitForTaskProcessed(t)
-		output, err := iamClient.GetRolePolicyWithContext(ctx, getRolePolicyInput)
-		require.NoError(t, err)
-		require.Contains(t, aws.StringValue(output.PolicyDocument), redshiftDatabase.GetAWS().Redshift.ClusterID)
-
-		// Deconfigure Redshift database, policy should get detached.
-		err = configurator.Teardown(ctx, redshiftDatabase)
-		require.NoError(t, err)
-		waitForTaskProcessed(t)
-		_, err = iamClient.GetRolePolicyWithContext(ctx, getRolePolicyInput)
-		require.True(t, trace.IsNotFound(err))
-	})
+				// Deconfigure database, policy should get detached.
+				err = configurator.Teardown(ctx, tt.database)
+				require.NoError(t, err)
+				waitForTaskProcessed(t)
+				_, err = iamClient.GetRolePolicyWithContext(ctx, getRolePolicyInput)
+				require.True(t, trace.IsNotFound(err))
+			})
+		}
+	}
 }
 
 // TestAWSIAMNoPermissions tests that lack of AWS permissions does not produce

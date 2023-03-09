@@ -46,7 +46,7 @@ func toTypeLabels(labels map[string]string) types.Labels {
 func mustMakeAWSFetchers(t *testing.T, clients cloud.AWSClients, matchers []services.AWSMatcher) []common.Fetcher {
 	t.Helper()
 
-	fetchers, err := MakeAWSFetchers(clients, matchers)
+	fetchers, err := MakeAWSFetchers(context.Background(), clients, matchers)
 	require.NoError(t, err)
 	require.NotEmpty(t, fetchers)
 
@@ -57,14 +57,16 @@ func mustMakeAWSFetchers(t *testing.T, clients cloud.AWSClients, matchers []serv
 	return fetchers
 }
 
-func mustMakeAWSFetchersForMatcher(t *testing.T, clients cloud.AWSClients, matcherType, region string, tags types.Labels) []common.Fetcher {
+func mustMakeAWSFetchersForMatcher(t *testing.T, clients *cloud.TestCloudClients, matcherType, region string, tags types.Labels) []common.Fetcher {
 	t.Helper()
-
-	return mustMakeAWSFetchers(t, clients, []services.AWSMatcher{{
-		Types:   []string{matcherType},
-		Regions: []string{region},
-		Tags:    tags,
-	}})
+	matchers := []services.AWSMatcher{{
+		Types:      []string{matcherType},
+		Regions:    []string{region},
+		Tags:       tags,
+		AssumeRole: testAssumeRole,
+	}}
+	mustAddAssumedRolesAndMockSessionsForMatchers(t, matchers, clients)
+	return mustMakeAWSFetchers(t, clients, matchers)
 }
 
 func mustMakeAzureFetchers(t *testing.T, clients cloud.AzureClients, matchers []services.AzureMatcher) []common.Fetcher {
@@ -95,4 +97,14 @@ func mustGetDatabases(t *testing.T, fetchers []common.Fetcher) types.Databases {
 		all = append(all, databases...)
 	}
 	return all
+}
+
+// testAssumeRole is a fixture for testing fetchers.
+// every matcher, stub database, and mock AWS Session created uses this fixture.
+// Tests will cover:
+//   - that fetchers use the configured assume role when using AWS cloud clients.
+//   - that databases discovered and created by fetchers have the assumed role used to discover them populated.
+var testAssumeRole = services.AssumeRole{
+	RoleARN:    "arn:aws:iam::123456789012:role/test-role",
+	ExternalID: "externalID123",
 }

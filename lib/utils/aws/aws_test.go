@@ -255,3 +255,65 @@ func TestValidateRoleARNAndExtractRoleName(t *testing.T) {
 		})
 	}
 }
+
+func TestParseRoleARN(t *testing.T) {
+	// TODO(gavin): write tests
+}
+func TestIsRoleARN(t *testing.T) {
+	// TODO(gavin): write tests
+}
+func TestBuildRoleARN(t *testing.T) {
+	// TODO(gavin): write tests
+}
+
+// TODO(gavin): use this as a base for testing, and then delete it.
+// func TestRedshiftServerlessUsernameToRoleARN(t *testing.T) {
+// 	t.Parallel()
+
+// 	tests := []struct {
+// 		inputUsername string
+// 		expectRoleARN string
+// 		expectError   bool
+// 	}{
+// 		{
+// 			inputUsername: "arn:aws:iam::123456789012:role/rolename",
+// 			expectRoleARN: "arn:aws:iam::123456789012:role/rolename",
+// 		},
+// 		{
+// 			inputUsername: "arn:aws:iam::123456789012:user/user",
+// 			expectError:   true,
+// 		},
+// 		{
+// 			inputUsername: "arn:aws:not-iam::123456789012:role/rolename",
+// 			expectError:   true,
+// 		},
+// 		{
+// 			inputUsername: "role/rolename",
+// 			expectRoleARN: "arn:aws:iam::123456789012:role/rolename",
+// 		},
+// 		{
+// 			inputUsername: "rolename",
+// 			expectRoleARN: "arn:aws:iam::123456789012:role/rolename",
+// 		},
+// 		{
+// 			inputUsername: "IAM:user",
+// 			expectError:   true,
+// 		},
+// 		{
+// 			inputUsername: "IAMR:rolename",
+// 			expectError:   true,
+// 		},
+// 	}
+
+// 	for _, test := range tests {
+// 		t.Run(test.inputUsername, func(t *testing.T) {
+// 			actualRoleARN, err := redshiftServerlessUsernameToRoleARN(newRedshiftServerlessDatabase(t).GetAWS(), test.inputUsername)
+// 			if test.expectError {
+// 				require.Error(t, err)
+// 			} else {
+// 				require.NoError(t, err)
+// 				require.Equal(t, test.expectRoleARN, actualRoleARN)
+// 			}
+// 		})
+// 	}
+// }
