@@ -48,7 +48,10 @@ import (
 	devicepb "github.com/gravitational/teleport/api/gen/proto/go/teleport/devicetrust/v1"
 	kubeproto "github.com/gravitational/teleport/api/gen/proto/go/teleport/kube/v1"
 	loginrulepb "github.com/gravitational/teleport/api/gen/proto/go/teleport/loginrule/v1"
+	oktapb "github.com/gravitational/teleport/api/gen/proto/go/teleport/okta/v1"
 	pluginspb "github.com/gravitational/teleport/api/gen/proto/go/teleport/plugins/v1"
+	samlidppb "github.com/gravitational/teleport/api/gen/proto/go/teleport/samlidp/v1"
+	trustpb "github.com/gravitational/teleport/api/gen/proto/go/teleport/trust/v1"
 	"github.com/gravitational/teleport/api/metadata"
 	"github.com/gravitational/teleport/api/observability/tracing"
 	"github.com/gravitational/teleport/api/types"
@@ -315,7 +318,7 @@ type (
 
 // authConnect connects to the Teleport Auth Server directly.
 func authConnect(ctx context.Context, params connectParams) (*Client, error) {
-	dialer := NewDialer(ctx, params.cfg.KeepAlivePeriod, params.cfg.DialTimeout)
+	dialer := NewDialer(ctx, params.cfg.KeepAlivePeriod, params.cfg.DialTimeout, WithTLSConfig(params.tlsConfig))
 	clt := newClient(params.cfg, dialer, params.tlsConfig)
 	if err := clt.dialGRPC(ctx, params.addr); err != nil {
 		return nil, trace.Wrap(err, "failed to connect to addr %v as an auth server", params.addr)
@@ -328,7 +331,7 @@ func tunnelConnect(ctx context.Context, params connectParams) (*Client, error) {
 	if params.sshConfig == nil {
 		return nil, trace.BadParameter("must provide ssh client config")
 	}
-	dialer := newTunnelDialer(*params.sshConfig, params.cfg.KeepAlivePeriod, params.cfg.DialTimeout)
+	dialer := newTunnelDialer(*params.sshConfig, params.cfg.KeepAlivePeriod, params.cfg.DialTimeout, WithTLSConfig(params.tlsConfig))
 	clt := newClient(params.cfg, dialer, params.tlsConfig)
 	if err := clt.dialGRPC(ctx, params.addr); err != nil {
 		return nil, trace.Wrap(err, "failed to connect to addr %v as a reverse tunnel proxy", params.addr)
@@ -341,7 +344,7 @@ func proxyConnect(ctx context.Context, params connectParams) (*Client, error) {
 	if params.sshConfig == nil {
 		return nil, trace.BadParameter("must provide ssh client config")
 	}
-	dialer := NewProxyDialer(*params.sshConfig, params.cfg.KeepAlivePeriod, params.cfg.DialTimeout, params.addr, params.cfg.InsecureAddressDiscovery)
+	dialer := NewProxyDialer(*params.sshConfig, params.cfg.KeepAlivePeriod, params.cfg.DialTimeout, params.addr, params.cfg.InsecureAddressDiscovery, WithTLSConfig(params.tlsConfig))
 	clt := newClient(params.cfg, dialer, params.tlsConfig)
 	if err := clt.dialGRPC(ctx, params.addr); err != nil {
 		return nil, trace.Wrap(err, "failed to connect to addr %v as a web proxy", params.addr)
@@ -528,7 +531,7 @@ func (c *Config) CheckAndSetDefaults() error {
 		c.KeepAliveCount = defaults.KeepAliveCountMax
 	}
 	if c.DialTimeout == 0 {
-		c.DialTimeout = defaults.DefaultDialTimeout
+		c.DialTimeout = defaults.DefaultIOTimeout
 	}
 	if c.CircuitBreakerConfig.Trip == nil || c.CircuitBreakerConfig.IsSuccessful == nil {
 		c.CircuitBreakerConfig = breaker.DefaultBreakerConfig(clockwork.NewRealClock())
@@ -568,9 +571,7 @@ func (c *Client) GetConnection() *grpc.ClientConn {
 // Close closes the Client connection to the auth server.
 func (c *Client) Close() error {
 	if c.setClosed() && c.conn != nil {
-		err := c.conn.Close()
-		c.conn = nil
-		return trace.Wrap(err)
+		return trace.Wrap(c.conn.Close())
 	}
 	return nil
 }
@@ -609,6 +610,21 @@ func (c *Client) DevicesClient() devicepb.DeviceTrustServiceClient {
 // return "not implemented" errors (as per the default gRPC behavior).
 func (c *Client) LoginRuleClient() loginrulepb.LoginRuleServiceClient {
 	return loginrulepb.NewLoginRuleServiceClient(c.conn)
+}
+
+// SAMLIdPClient returns an unadorned SAML IdP client, using the underlying
+// Auth gRPC connection.
+// Clients connecting to non-Enterprise clusters, or older Teleport versions,
+// still get a SAML IdP client when calling this method, but all RPCs will
+// return "not implemented" errors (as per the default gRPC behavior).
+func (c *Client) SAMLIdPClient() samlidppb.SAMLIdPServiceClient {
+	return samlidppb.NewSAMLIdPServiceClient(c.conn)
+}
+
+// TrustClient returns an unadorned Trust client, using the underlying
+// Auth gRPC connection.
+func (c *Client) TrustClient() trustpb.TrustServiceClient {
+	return trustpb.NewTrustServiceClient(c.conn)
 }
 
 // Ping gets basic info about the auth server.
@@ -2265,6 +2281,27 @@ func (c *Client) GetInstallers(ctx context.Context) ([]types.Installer, error) {
 	return installers, nil
 }
 
+// GetUIConfig gets the configuration for the UI served by the proxy service
+func (c *Client) GetUIConfig(ctx context.Context) (types.UIConfig, error) {
+	resp, err := c.grpc.GetUIConfig(ctx, &emptypb.Empty{}, c.callOpts...)
+	return resp, trail.FromGRPC(err)
+}
+
+// SetUIConfig sets the configuration for the UI served by the proxy service
+func (c *Client) SetUIConfig(ctx context.Context, uic types.UIConfig) error {
+	uicV1, ok := uic.(*types.UIConfigV1)
+	if !ok {
+		return trace.BadParameter("invalid type %T", uic)
+	}
+	_, err := c.grpc.SetUIConfig(ctx, uicV1, c.callOpts...)
+	return trail.FromGRPC(err)
+}
+
+func (c *Client) DeleteUIConfig(ctx context.Context) error {
+	_, err := c.grpc.DeleteUIConfig(ctx, &emptypb.Empty{}, c.callOpts...)
+	return trail.FromGRPC(err)
+}
+
 // GetInstaller gets the cluster installer resource
 func (c *Client) GetInstaller(ctx context.Context, name string) (types.Installer, error) {
 	resp, err := c.grpc.GetInstaller(ctx, &types.ResourceRequest{Name: name}, c.callOpts...)
@@ -3329,4 +3366,81 @@ func (c *Client) DeleteAllUserGroups(ctx context.Context) error {
 // "not implemented" errors (as per the default gRPC behavior).
 func (c *Client) PluginsClient() pluginspb.PluginServiceClient {
 	return pluginspb.NewPluginServiceClient(c.conn)
+}
+
+// GetLoginRule retrieves a login rule described by name.
+func (c *Client) GetLoginRule(ctx context.Context, name string) (*loginrulepb.LoginRule, error) {
+	rule, err := c.LoginRuleClient().GetLoginRule(ctx, &loginrulepb.GetLoginRuleRequest{
+		Name: name,
+	}, c.callOpts...)
+	return rule, trail.FromGRPC(err)
+}
+
+// CreateLoginRule creates a login rule if one with the same name does not
+// already exist, else it returns an error.
+func (c *Client) CreateLoginRule(ctx context.Context, rule *loginrulepb.LoginRule) (*loginrulepb.LoginRule, error) {
+	rule, err := c.LoginRuleClient().CreateLoginRule(ctx, &loginrulepb.CreateLoginRuleRequest{
+		LoginRule: rule,
+	}, c.callOpts...)
+	return rule, trail.FromGRPC(err)
+}
+
+// UpsertLoginRule creates a login rule if one with the same name does not
+// already exist, else it replaces the existing login rule.
+func (c *Client) UpsertLoginRule(ctx context.Context, rule *loginrulepb.LoginRule) (*loginrulepb.LoginRule, error) {
+	rule, err := c.LoginRuleClient().UpsertLoginRule(ctx, &loginrulepb.UpsertLoginRuleRequest{
+		LoginRule: rule,
+	}, c.callOpts...)
+	return rule, trail.FromGRPC(err)
+}
+
+// DeleteLoginRule deletes an existing login rule by name.
+func (c *Client) DeleteLoginRule(ctx context.Context, name string) error {
+	_, err := c.LoginRuleClient().DeleteLoginRule(ctx, &loginrulepb.DeleteLoginRuleRequest{
+		Name: name,
+	}, c.callOpts...)
+	return trail.FromGRPC(err)
+}
+
+// OktaClient returns an Okta client.
+// Clients connecting older Teleport versions still get an okta client when
+// calling this method, but all RPCs will return "not implemented" errors (as per
+// the default gRPC behavior).
+func (c *Client) OktaClient() oktapb.OktaServiceClient {
+	return oktapb.NewOktaServiceClient(c.conn)
+}
+
+// GetCertAuthority retrieves a CA by type and domain.
+func (c *Client) GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool) (types.CertAuthority, error) {
+	ca, err := c.TrustClient().GetCertAuthority(ctx, &trustpb.GetCertAuthorityRequest{
+		Type:       string(id.Type),
+		Domain:     id.DomainName,
+		IncludeKey: loadKeys,
+	})
+
+	return ca, trail.FromGRPC(err)
+}
+
+// UpdateHeadlessAuthenticationState updates a headless authentication state.
+func (c *Client) UpdateHeadlessAuthenticationState(ctx context.Context, id string, state types.HeadlessAuthenticationState, mfaResponse *proto.MFAAuthenticateResponse) error {
+	_, err := c.grpc.UpdateHeadlessAuthenticationState(ctx, &proto.UpdateHeadlessAuthenticationStateRequest{
+		Id:          id,
+		State:       state,
+		MfaResponse: mfaResponse,
+	}, c.callOpts...)
+	if err != nil {
+		return trail.FromGRPC(err)
+	}
+	return nil
+}
+
+// GetHeadlessAuthentication retrieves a headless authentication by id.
+func (c *Client) GetHeadlessAuthentication(ctx context.Context, id string) (*types.HeadlessAuthentication, error) {
+	headlessAuthn, err := c.grpc.GetHeadlessAuthentication(ctx, &proto.GetHeadlessAuthenticationRequest{
+		Id: id,
+	}, c.callOpts...)
+	if err != nil {
+		return nil, trail.FromGRPC(err)
+	}
+	return headlessAuthn, nil
 }

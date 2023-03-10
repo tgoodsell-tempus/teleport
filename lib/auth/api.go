@@ -110,7 +110,7 @@ type ReadNodeAccessPoint interface {
 	NewWatcher(ctx context.Context, watch types.Watch) (types.Watcher, error)
 
 	// GetCertAuthority returns cert authority by id
-	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool, opts ...services.MarshalOption) (types.CertAuthority, error)
+	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool) (types.CertAuthority, error)
 
 	// GetCertAuthorities returns a list of cert authorities
 	GetCertAuthorities(ctx context.Context, caType types.CertAuthType, loadKeys bool, opts ...services.MarshalOption) ([]types.CertAuthority, error)
@@ -168,7 +168,7 @@ type ReadProxyAccessPoint interface {
 	NewWatcher(ctx context.Context, watch types.Watch) (types.Watcher, error)
 
 	// GetCertAuthority returns cert authority by id
-	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool, opts ...services.MarshalOption) (types.CertAuthority, error)
+	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool) (types.CertAuthority, error)
 
 	// GetCertAuthorities returns a list of cert authorities
 	GetCertAuthorities(ctx context.Context, caType types.CertAuthType, loadKeys bool, opts ...services.MarshalOption) ([]types.CertAuthority, error)
@@ -187,6 +187,9 @@ type ReadProxyAccessPoint interface {
 
 	// GetSessionRecordingConfig returns session recording configuration.
 	GetSessionRecordingConfig(ctx context.Context, opts ...services.MarshalOption) (types.SessionRecordingConfig, error)
+
+	// GetUIConfig returns configuration for the UI served by the proxy service
+	GetUIConfig(ctx context.Context) (types.UIConfig, error)
 
 	// GetRole returns role by name
 	GetRole(ctx context.Context, name string) (types.Role, error)
@@ -279,6 +282,21 @@ type ReadProxyAccessPoint interface {
 	GetKubernetesClusters(ctx context.Context) ([]types.KubeCluster, error)
 	// GetKubernetesCluster returns the specified kubernetes cluster resource.
 	GetKubernetesCluster(ctx context.Context, name string) (types.KubeCluster, error)
+
+	// GetSAMLIdPServiceProvider returns the specified SAML IdP service provider resources.
+	GetSAMLIdPServiceProvider(ctx context.Context, name string) (types.SAMLIdPServiceProvider, error)
+
+	// ListSAMLIdPServiceProviders returns a paginated list of all SAML IdP service provider resources.
+	ListSAMLIdPServiceProviders(context.Context, int, string) ([]types.SAMLIdPServiceProvider, string, error)
+
+	// GetSAMLIdPSession gets a SAML IdP session.
+	GetSAMLIdPSession(context.Context, types.GetSAMLIdPSessionRequest) (types.WebSession, error)
+
+	// ListUserGroups returns a paginated list of user group resources.
+	ListUserGroups(ctx context.Context, pageSize int, nextKey string) ([]types.UserGroup, string, error)
+
+	// GetUserGroup returns the specified user group resources.
+	GetUserGroup(ctx context.Context, name string) (types.UserGroup, error)
 }
 
 // SnowflakeSessionWatcher is watcher interface used by Snowflake web session watcher.
@@ -311,7 +329,7 @@ type ReadRemoteProxyAccessPoint interface {
 	NewWatcher(ctx context.Context, watch types.Watch) (types.Watcher, error)
 
 	// GetCertAuthority returns cert authority by id
-	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool, opts ...services.MarshalOption) (types.CertAuthority, error)
+	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool) (types.CertAuthority, error)
 
 	// GetCertAuthorities returns a list of cert authorities
 	GetCertAuthorities(ctx context.Context, caType types.CertAuthType, loadKeys bool, opts ...services.MarshalOption) ([]types.CertAuthority, error)
@@ -406,7 +424,7 @@ type ReadKubernetesAccessPoint interface {
 	NewWatcher(ctx context.Context, watch types.Watch) (types.Watcher, error)
 
 	// GetCertAuthority returns cert authority by id
-	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool, opts ...services.MarshalOption) (types.CertAuthority, error)
+	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool) (types.CertAuthority, error)
 
 	// GetCertAuthorities returns a list of cert authorities
 	GetCertAuthorities(ctx context.Context, caType types.CertAuthType, loadKeys bool, opts ...services.MarshalOption) ([]types.CertAuthority, error)
@@ -476,7 +494,7 @@ type ReadAppsAccessPoint interface {
 	NewWatcher(ctx context.Context, watch types.Watch) (types.Watcher, error)
 
 	// GetCertAuthority returns cert authority by id
-	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool, opts ...services.MarshalOption) (types.CertAuthority, error)
+	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool) (types.CertAuthority, error)
 
 	// GetCertAuthorities returns a list of cert authorities
 	GetCertAuthorities(ctx context.Context, caType types.CertAuthType, loadKeys bool, opts ...services.MarshalOption) ([]types.CertAuthority, error)
@@ -543,7 +561,7 @@ type ReadDatabaseAccessPoint interface {
 	NewWatcher(ctx context.Context, watch types.Watch) (types.Watcher, error)
 
 	// GetCertAuthority returns cert authority by id
-	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool, opts ...services.MarshalOption) (types.CertAuthority, error)
+	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool) (types.CertAuthority, error)
 
 	// GetCertAuthorities returns a list of cert authorities
 	GetCertAuthorities(ctx context.Context, caType types.CertAuthType, loadKeys bool, opts ...services.MarshalOption) ([]types.CertAuthority, error)
@@ -610,7 +628,7 @@ type ReadWindowsDesktopAccessPoint interface {
 	NewWatcher(ctx context.Context, watch types.Watch) (types.Watcher, error)
 
 	// GetCertAuthority returns cert authority by id
-	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool, opts ...services.MarshalOption) (types.CertAuthority, error)
+	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool) (types.CertAuthority, error)
 
 	// GetCertAuthorities returns a list of cert authorities
 	GetCertAuthorities(ctx context.Context, caType types.CertAuthType, loadKeys bool, opts ...services.MarshalOption) ([]types.CertAuthority, error)
@@ -677,7 +695,7 @@ type ReadDiscoveryAccessPoint interface {
 	NewWatcher(ctx context.Context, watch types.Watch) (types.Watcher, error)
 
 	// GetCertAuthority returns cert authority by id
-	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool, opts ...services.MarshalOption) (types.CertAuthority, error)
+	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool) (types.CertAuthority, error)
 
 	// GetCertAuthorities returns a list of cert authorities
 	GetCertAuthorities(ctx context.Context, caType types.CertAuthType, loadKeys bool, opts ...services.MarshalOption) ([]types.CertAuthority, error)
@@ -729,7 +747,7 @@ type DiscoveryAccessPoint interface {
 // AccessCache is a subset of the interface working on the certificate authorities
 type AccessCache interface {
 	// GetCertAuthority returns cert authority by id
-	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool, opts ...services.MarshalOption) (types.CertAuthority, error)
+	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool) (types.CertAuthority, error)
 
 	// GetCertAuthorities returns a list of cert authorities
 	GetCertAuthorities(ctx context.Context, caType types.CertAuthType, loadKeys bool, opts ...services.MarshalOption) ([]types.CertAuthority, error)
@@ -793,7 +811,7 @@ type Cache interface {
 	GetAuthServers() ([]types.Server, error)
 
 	// GetCertAuthority returns cert authority by id
-	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool, opts ...services.MarshalOption) (types.CertAuthority, error)
+	GetCertAuthority(ctx context.Context, id types.CertAuthID, loadKeys bool) (types.CertAuthority, error)
 
 	// GetCertAuthorities returns a list of cert authorities
 	GetCertAuthorities(ctx context.Context, caType types.CertAuthType, loadKeys bool, opts ...services.MarshalOption) ([]types.CertAuthority, error)
@@ -902,6 +920,9 @@ type Cache interface {
 	ListWindowsDesktops(ctx context.Context, req types.ListWindowsDesktopsRequest) (*types.ListWindowsDesktopsResponse, error)
 	// ListWindowsDesktopServices returns a paginated list of windows desktops.
 	ListWindowsDesktopServices(ctx context.Context, req types.ListWindowsDesktopServicesRequest) (*types.ListWindowsDesktopServicesResponse, error)
+
+	// GetUIConfig gets the config for the UI served by the proxy service
+	GetUIConfig(ctx context.Context) (types.UIConfig, error)
 
 	// GetInstaller gets installer resource for this cluster
 	GetInstaller(ctx context.Context, name string) (types.Installer, error)

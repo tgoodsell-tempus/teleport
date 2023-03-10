@@ -78,6 +78,7 @@ func ForAuth(cfg Config) Config {
 		{Kind: types.KindClusterNetworkingConfig},
 		{Kind: types.KindClusterAuthPreference},
 		{Kind: types.KindSessionRecordingConfig},
+		{Kind: types.KindUIConfig},
 		{Kind: types.KindStaticTokens},
 		{Kind: types.KindToken},
 		{Kind: types.KindUser},
@@ -126,6 +127,7 @@ func ForProxy(cfg Config) Config {
 		{Kind: types.KindClusterNetworkingConfig},
 		{Kind: types.KindClusterAuthPreference},
 		{Kind: types.KindSessionRecordingConfig},
+		{Kind: types.KindUIConfig},
 		{Kind: types.KindUser},
 		{Kind: types.KindRole},
 		{Kind: types.KindNamespace},
@@ -818,7 +820,7 @@ func New(config Config) (*Cache, error) {
 // Start the cache. Should only be called once.
 func (c *Cache) Start() error {
 	retry, err := retryutils.NewLinear(retryutils.LinearConfig{
-		First:  utils.HalfJitter(c.MaxRetryPeriod / 10),
+		First:  utils.FullJitter(c.MaxRetryPeriod / 10),
 		Step:   c.MaxRetryPeriod / 5,
 		Max:    c.MaxRetryPeriod,
 		Jitter: retryutils.NewHalfJitter(),
@@ -1369,7 +1371,7 @@ var _ map[getCertAuthorityCacheKey]struct{} // compile-time hashability check
 
 // GetCertAuthority returns certificate authority by given id. Parameter loadSigningKeys
 // controls if signing keys are loaded
-func (c *Cache) GetCertAuthority(ctx context.Context, id types.CertAuthID, loadSigningKeys bool, opts ...services.MarshalOption) (types.CertAuthority, error) {
+func (c *Cache) GetCertAuthority(ctx context.Context, id types.CertAuthID, loadSigningKeys bool) (types.CertAuthority, error) {
 	ctx, span := c.Tracer.Start(ctx, "cache/GetCertAuthority")
 	defer span.End()
 
@@ -1381,7 +1383,7 @@ func (c *Cache) GetCertAuthority(ctx context.Context, id types.CertAuthID, loadS
 
 	if !rg.IsCacheRead() && !loadSigningKeys {
 		cachedCA, err := utils.FnCacheGet(ctx, c.fnCache, getCertAuthorityCacheKey{id}, func(ctx context.Context) (types.CertAuthority, error) {
-			ca, err := rg.trust.GetCertAuthority(ctx, id, loadSigningKeys, opts...)
+			ca, err := rg.trust.GetCertAuthority(ctx, id, loadSigningKeys)
 			return ca, err
 		})
 		if err != nil {
@@ -1390,13 +1392,13 @@ func (c *Cache) GetCertAuthority(ctx context.Context, id types.CertAuthID, loadS
 		return cachedCA.Clone(), nil
 	}
 
-	ca, err := rg.trust.GetCertAuthority(ctx, id, loadSigningKeys, opts...)
+	ca, err := rg.trust.GetCertAuthority(ctx, id, loadSigningKeys)
 	if trace.IsNotFound(err) && rg.IsCacheRead() {
 		// release read lock early
 		rg.Release()
 		// fallback is sane because method is never used
 		// in construction of derivative caches.
-		if ca, err := c.Config.Trust.GetCertAuthority(ctx, id, loadSigningKeys, opts...); err == nil {
+		if ca, err := c.Config.Trust.GetCertAuthority(ctx, id, loadSigningKeys); err == nil {
 			return ca, nil
 		}
 	}
@@ -1560,6 +1562,20 @@ func (c *Cache) GetClusterName(opts ...services.MarshalOption) (types.ClusterNam
 		return cachedName.Clone(), nil
 	}
 	return rg.clusterConfig.GetClusterName(opts...)
+}
+
+func (c *Cache) GetUIConfig(ctx context.Context) (types.UIConfig, error) {
+	ctx, span := c.Tracer.Start(ctx, "cache/GetUIConfig")
+	defer span.End()
+
+	rg, err := c.read()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	defer rg.Release()
+
+	uiconfig, err := rg.clusterConfig.GetUIConfig(ctx)
+	return uiconfig, trace.Wrap(err)
 }
 
 // GetInstaller gets the installer script resource for the cluster

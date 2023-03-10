@@ -43,7 +43,7 @@ import (
 	"github.com/gravitational/teleport/lib/client"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/devicetrust"
-	"github.com/gravitational/teleport/lib/service"
+	"github.com/gravitational/teleport/lib/service/servicecfg"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/utils"
 	"github.com/gravitational/teleport/tool/tctl/common/device"
@@ -59,7 +59,7 @@ type ResourceKind string
 // ResourceCommand implements `tctl get/create/list` commands for manipulating
 // Teleport resources
 type ResourceCommand struct {
-	config      *service.Config
+	config      *servicecfg.Config
 	ref         services.Ref
 	refs        services.Refs
 	format      string
@@ -99,7 +99,7 @@ Same as above, but using JSON output:
 `
 
 // Initialize allows ResourceCommand to plug itself into the CLI parser
-func (rc *ResourceCommand) Initialize(app *kingpin.Application, config *service.Config) {
+func (rc *ResourceCommand) Initialize(app *kingpin.Application, config *servicecfg.Config) {
 	rc.CreateHandlers = map[ResourceKind]ResourceCreateHandler{
 		types.KindUser:                    rc.createUser,
 		types.KindRole:                    rc.createRole,
@@ -109,6 +109,7 @@ func (rc *ResourceCommand) Initialize(app *kingpin.Application, config *service.
 		types.KindClusterAuthPreference:   rc.createAuthPreference,
 		types.KindClusterNetworkingConfig: rc.createClusterNetworkingConfig,
 		types.KindSessionRecordingConfig:  rc.createSessionRecordingConfig,
+		types.KindUIConfig:                rc.createUIConfig,
 		types.KindLock:                    rc.createLock,
 		types.KindNetworkRestrictions:     rc.createNetworkRestrictions,
 		types.KindApp:                     rc.createApp,
@@ -639,14 +640,36 @@ func (rc *ResourceCommand) createInstaller(ctx context.Context, client auth.Clie
 	return trace.Wrap(err)
 }
 
+func (rc *ResourceCommand) createUIConfig(ctx context.Context, client auth.ClientI, raw services.UnknownResource) error {
+	uic, err := services.UnmarshalUIConfig(raw.Raw)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	return trace.Wrap(client.SetUIConfig(ctx, uic))
+}
+
 func (rc *ResourceCommand) createNode(ctx context.Context, client auth.ClientI, raw services.UnknownResource) error {
 	server, err := services.UnmarshalServer(raw.Raw, types.KindNode)
 	if err != nil {
 		return trace.Wrap(err)
 	}
+	if err := server.CheckAndSetDefaults(); err != nil {
+		return trace.Wrap(err)
+	}
 
-	if !rc.force {
-		return trace.AlreadyExists("nodes cannot be created, only upserted")
+	name := server.GetName()
+	_, err = client.GetNode(ctx, server.GetNamespace(), name)
+	if err != nil && !trace.IsNotFound(err) {
+		return trace.Wrap(err)
+	}
+	exists := (err == nil)
+	if !rc.IsForced() && exists {
+		return trace.AlreadyExists("node %q with Hostname %q and Addr %q already exists, use --force flag to override",
+			name,
+			server.GetHostname(),
+			server.GetAddr(),
+		)
 	}
 
 	_, err = client.UpsertNode(ctx, server)
@@ -761,7 +784,7 @@ func (rc *ResourceCommand) createSAMLIdPServiceProvider(ctx context.Context, cli
 
 func (rc *ResourceCommand) createDevice(ctx context.Context, client auth.ClientI, raw services.UnknownResource) error {
 	if rc.IsForced() {
-		fmt.Printf("Warning: Devices cannot be overwritten with the --force flag.")
+		fmt.Printf("Warning: Devices cannot be overwritten with the --force flag\n")
 	}
 
 	dev, err := device.UnmarshalDevice(raw.Raw)
@@ -769,15 +792,16 @@ func (rc *ResourceCommand) createDevice(ctx context.Context, client auth.ClientI
 		return trace.Wrap(err)
 	}
 
+	// TODO(codingllama): Figure out a way to call BulkCreateDevices here?
 	_, err = client.DevicesClient().CreateDevice(ctx, &devicepb.CreateDeviceRequest{
-		Device:            dev,
-		CreateEnrollToken: false,
+		Device:           dev,
+		CreateAsResource: true,
 	})
 	if err != nil {
 		return trail.FromGRPC(err)
 	}
 
-	fmt.Printf("Device %v/%v added to the inventory", dev.AssetTag, devicetrust.FriendlyOSType(dev.OsType))
+	fmt.Printf("Device %v/%v added to the inventory\n", dev.AssetTag, devicetrust.FriendlyOSType(dev.OsType))
 	return nil
 }
 
@@ -788,6 +812,7 @@ func (rc *ResourceCommand) Delete(ctx context.Context, client auth.ClientI) (err
 		types.KindClusterNetworkingConfig,
 		types.KindSessionRecordingConfig,
 		types.KindInstaller,
+		types.KindUIConfig,
 	}
 	if !slices.Contains(singletonResources, rc.ref.Kind) && (rc.ref.Kind == "" || rc.ref.Name == "") {
 		return trace.BadParameter("provide a full resource name to delete, for example:\n$ tctl rm cluster/east\n")
@@ -995,6 +1020,12 @@ func (rc *ResourceCommand) Delete(ctx context.Context, client auth.ClientI) (err
 			return trace.NotFound("kubernetes server %q not found", rc.ref.Name)
 		}
 		fmt.Printf("kubernetes server %q has been deleted\n", rc.ref.Name)
+	case types.KindUIConfig:
+		err := client.DeleteUIConfig(ctx)
+		if err != nil {
+			return trace.Wrap(err)
+		}
+		fmt.Printf("%s has been deleted\n", types.KindUIConfig)
 	case types.KindInstaller:
 		err := client.DeleteInstaller(ctx, rc.ref.Name)
 		if err != nil {
@@ -1545,6 +1576,15 @@ func (rc *ResourceCommand) getCollection(ctx context.Context, client auth.Client
 			return nil, trace.Wrap(err)
 		}
 		return &installerCollection{installers: []types.Installer{inst}}, nil
+	case types.KindUIConfig:
+		if rc.ref.Name != "" {
+			return nil, trace.BadParameter("only simple `tctl get %v` can be used", types.KindUIConfig)
+		}
+		uiconfig, err := client.GetUIConfig(ctx)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return &uiConfigCollection{uiconfig}, nil
 	case types.KindDatabaseService:
 		resourceName := rc.ref.Name
 		listReq := proto.ListResourcesRequest{
