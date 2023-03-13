@@ -21,11 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 
 	"github.com/gravitational/trace"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgproto3/v2"
+	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gravitational/teleport/api/types"
@@ -214,6 +215,21 @@ func (e *Engine) checkAccess(ctx context.Context, sessionCtx *common.Session) er
 	return nil
 }
 
+var sp1 = `
+create or replace procedure teleport_create_user(username varchar, roles varchar[])
+language plpgsql
+as $$
+declare
+    role_ varchar;
+begin
+    execute format('create user %I', username);
+    foreach role_ in array roles
+    loop
+        execute format('grant %I to %I', role_, username);
+    end loop;
+end;$$;
+`
+
 var storedProcedure = `create or replace procedure teleport_delete_%v()
 language plpgsql
 as $$
@@ -234,24 +250,56 @@ func (e *Engine) provisionUser(ctx context.Context, sessionCtx *common.Session) 
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	conn, err := pgconn.ConnectConfig(ctx, config)
+	pgxConf, _ := pgx.ParseConfig("")
+	pgxConf.Config = *config
+	conn, err := pgx.ConnectConfig(ctx, pgxConf)
+	// conn, err := pgconn.ConnectConfig(ctx, config)
 	if err != nil {
 		return common.ConvertConnectError(err, sessionCtx)
 	}
 	defer conn.Close(ctx)
-	result := conn.Exec(ctx, fmt.Sprintf(storedProcedure, databaseUser, databaseUser, databaseUser))
-	if err = result.Close(); err != nil {
+	_, err = conn.Exec(ctx, fmt.Sprintf(storedProcedure, databaseUser, databaseUser, databaseUser))
+	if err != nil {
 		return trace.Wrap(err)
 	}
+	// result := conn.Exec(ctx, fmt.Sprintf(storedProcedure, databaseUser, databaseUser, databaseUser))
+	// if err = result.Close(); err != nil {
+	// 	return trace.Wrap(err)
+	// }
 	e.Log.Infof("Created stored procedure teleport_delete_%v", databaseUser)
-	result = conn.Exec(ctx, fmt.Sprintf("create role %v login", databaseUser))
-	if err = result.Close(); err != nil {
-		if strings.Contains(err.Error(), "already exists") {
-			e.Log.Infof("Postgres user %v already exists.", databaseUser)
-			return nil
-		}
+	_, err = conn.Exec(ctx, sp1)
+	if err != nil {
 		return trace.Wrap(err)
 	}
+	// result = conn.Exec(ctx, sp1)
+	// if err = result.Close(); err != nil {
+	// 	return trace.Wrap(err)
+	// }
+	e.Log.Infof("Created stored procedure teleport_create_user")
+	// result = conn.Exec(ctx, fmt.Sprintf("create role %v login", databaseUser))
+
+	var buf []byte
+	va := pgtype.VarcharArray{}
+	va.Set([]string{})
+	buf, err = va.EncodeText(nil, buf)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	_, err = conn.Exec(ctx, `call teleport_create_user($1, '{}'::varchar[])`, databaseUser)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	// result2 := conn.ExecParams(ctx, `call teleport_create_user($1, $2::varchar[])`, [][]byte{[]byte(databaseUser), []byte("{}")},
+	// 	[]uint32{pgtype.VarcharOID, pgtype.VarcharArrayOID}, nil, nil)
+	// if _, err = result2.Close(); err != nil {
+	// 	if strings.Contains(err.Error(), "already exists") {
+	// 		e.Log.Infof("Postgres user %v already exists.", databaseUser)
+	// 		return nil
+	// 	}
+	// 	return trace.Wrap(err)
+	// }
 	e.Log.Infof("Created Postgres user %v.", databaseUser)
 	return nil
 }

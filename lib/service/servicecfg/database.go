@@ -127,6 +127,7 @@ func (d *Database) ToDatabase() (types.Database, error) {
 		MySQL: types.MySQLOptions{
 			ServerVersion: d.MySQL.ServerVersion,
 		},
+		AdminUser: d.AdminUser,
 		AWS: types.AWS{
 			AccountID:  d.AWS.AccountID,
 			ExternalID: d.AWS.ExternalID,
