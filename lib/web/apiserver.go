@@ -2382,7 +2382,7 @@ func (h *Handler) getClusterLocks(
 
 	// Lock data structure is reformatted to save doing it on the client as the
 	// Table component doesn't support nested complex objects.
-	var lockList []UILock
+	lockList := make([]UILock, 0)
 	for i := 0; i < len(locks); i++ {
 		lockList = append(lockList, UILock{
 			locks[i].GetMetadata().Name,
