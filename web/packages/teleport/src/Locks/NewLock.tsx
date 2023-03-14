@@ -17,11 +17,10 @@ limitations under the License.
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 
-import { Box, Input } from 'design';
+import { Box, ButtonPrimary, Flex, Text, Input } from 'design';
 import Select from 'shared/components/Select';
 import Table, { Cell } from 'design/DataTable';
 
-import cfg from 'teleport/config';
 import useTeleport from 'teleport/useTeleport';
 import useStickyClusterId from 'teleport/useStickyClusterId';
 
@@ -138,20 +137,17 @@ export default function NewLock() {
           Session & Identity Locks / Create New Lock
         </FeatureHeaderTitle>
       </FeatureHeader>
-      <Box width="150px" mb={4} data-testid="resource-selector">
-        <Select
-          value={selectedTargetType}
-          options={lockTargets}
-          onChange={(o: LockTarget) => setSelectedTargetType(o)}
-        />
-      </Box>
-      {selectedTargetType.value === 'login' ? (
-        <Box>
-          <Input placeholder="login name" />
+      <Flex justifyContent="space-between">
+        <Box width="150px" mb={4} data-testid="resource-selector">
+          <Select
+            value={selectedTargetType}
+            options={lockTargets}
+            onChange={(o: LockTarget) => setSelectedTargetType(o)}
+          />
         </Box>
-      ) : (
-        <TargetList data={targetData} />
-      )}
+        <QuickAdd targetType={selectedTargetType.label} />
+      </Flex>
+      <TargetList data={targetData} selectedTarget={selectedTargetType.value} />
     </FeatureBox>
   );
 }
@@ -164,10 +160,15 @@ const StyledTable = styled(Table)`
 
 type TargetListProps = {
   data: TableData[];
+  selectedTarget: AllowedTargets;
 };
 
-export function TargetList({ data }: TargetListProps) {
+function TargetList({ data, selectedTarget }: TargetListProps) {
   if (!data) data = [];
+
+  if (selectedTarget === 'device') {
+    return <Box>Not Implemented</Box>;
+  }
 
   const columns = data.length
     ? Object.keys(data[0]).map(c => ({
@@ -178,5 +179,19 @@ export function TargetList({ data }: TargetListProps) {
     : [];
   return (
     <StyledTable data={data} columns={columns} emptyText="No Targets Found" />
+  );
+}
+
+function QuickAdd({ targetType }: { targetType: string }) {
+  return (
+    <Flex
+      justifyContent="flex-end"
+      alignItems="baseline"
+      css={{ columnGap: '20px' }}
+      mb={4}
+    >
+      <Input placeholder={`Quick add ${targetType}`} width={500} />
+      <ButtonPrimary>Add</ButtonPrimary>
+    </Flex>
   );
 }
