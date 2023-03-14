@@ -17,7 +17,7 @@ limitations under the License.
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 
-import { Box } from 'design';
+import { Box, Input } from 'design';
 import Select from 'shared/components/Select';
 import Table, { Cell } from 'design/DataTable';
 
@@ -35,27 +35,64 @@ type TableData = {
   [key: string]: string;
 };
 
-function filterTargetData(targetType: AllowedTargets, data: any): TableData[] {
-  if (targetType === 'user') {
-    return data.map(u => ({
-      name: u.name,
-      roles: u.roles.join(', '),
-    }));
-  }
-}
-
 const useGetTargetData = (targetType: AllowedTargets, clusterId: string) => {
   const [targetData, setTargetData] = useState<TableData[]>();
-  const { userService } = useTeleport();
+  const { userService, resourceService, nodeService, mfaService } =
+    useTeleport();
 
   useEffect(() => {
-    if (targetType == 'user') {
-      userService.fetchUsers().then(users => {
-        const filteredData = filterTargetData('user', users);
-        setTargetData(filteredData);
-      });
+    switch (targetType) {
+      case 'user':
+        userService.fetchUsers().then(users => {
+          const filteredData = users.map(u => ({
+            name: u.name,
+            roles: u.roles.join(', '),
+          }));
+          setTargetData(filteredData);
+        });
+        break;
+      case 'role':
+        resourceService.fetchRoles().then(roles => {
+          const filteredData = roles.map(r => ({
+            name: r.name,
+          }));
+          setTargetData(filteredData);
+        });
+        break;
+      case 'node':
+        nodeService
+          .fetchNodes(clusterId, {
+            limit: 10,
+          })
+          .then(nodes => {
+            const filteredData = nodes.agents.map(n => ({
+              hostname: n.hostname,
+              addr: n.addr,
+              labels: n.labels.join(', '),
+            }));
+            setTargetData(filteredData);
+          });
+        break;
+      case 'mfa_device':
+        mfaService.fetchDevices().then(mfas => {
+          const filteredData = mfas.map(m => ({
+            name: m.name,
+            id: m.id,
+            description: m.description,
+            lastUsed: m.lastUsedDate.toUTCString(),
+          }));
+          setTargetData(filteredData);
+        });
+        break;
     }
-  }, [targetType, userService]);
+  }, [
+    clusterId,
+    mfaService,
+    nodeService,
+    resourceService,
+    targetType,
+    userService,
+  ]);
 
   return targetData;
 };
@@ -87,7 +124,10 @@ const lockTargets: LockTarget[] = [
 ];
 
 export default function NewLock() {
-  const [selectedTargetType, setSelectedTargetType] = useState<LockTarget>();
+  const [selectedTargetType, setSelectedTargetType] = useState<LockTarget>({
+    label: 'User',
+    value: 'user',
+  });
   const { clusterId } = useStickyClusterId();
   const targetData = useGetTargetData(selectedTargetType?.value, clusterId);
 
@@ -105,7 +145,13 @@ export default function NewLock() {
           onChange={(o: LockTarget) => setSelectedTargetType(o)}
         />
       </Box>
-      <TargetList data={targetData} />
+      {selectedTargetType.value === 'login' ? (
+        <Box>
+          <Input placeholder="login name" />
+        </Box>
+      ) : (
+        <TargetList data={targetData} />
+      )}
     </FeatureBox>
   );
 }
