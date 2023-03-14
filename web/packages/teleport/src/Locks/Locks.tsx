@@ -17,6 +17,7 @@ limitations under the License.
 import React, { useEffect, useState } from 'react';
 
 import Table, { Cell } from 'design/DataTable';
+import { ButtonPrimary } from 'design/Button';
 import { MenuButton, MenuItem } from 'shared/components/MenuAction';
 
 import api from 'teleport/services/api';
@@ -28,6 +29,8 @@ import {
   FeatureHeader,
   FeatureHeaderTitle,
 } from 'teleport/components/Layout';
+
+import { NavLink } from 'teleport/components/Router';
 
 type Lock = {
   name: string;
@@ -69,6 +72,13 @@ export function Locks() {
     <FeatureBox>
       <FeatureHeader>
         <FeatureHeaderTitle>Session & Identity Locks</FeatureHeaderTitle>
+        <ButtonPrimary
+          as={NavLink}
+          to={cfg.getNewLocksRoute(clusterId)}
+          ml="auto"
+        >
+          + Add New Lock
+        </ButtonPrimary>
       </FeatureHeader>
       <Table
         data={lockData}

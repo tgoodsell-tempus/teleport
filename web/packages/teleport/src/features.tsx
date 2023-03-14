@@ -86,6 +86,9 @@ const AuthConnectors = React.lazy(
 const Locks = React.lazy(
   () => import(/* webpackChunkName: "lazy" */ './Locks')
 );
+const NewLock = React.lazy(
+  () => import(/* webpackChunkName: "newLock" */ './Locks/NewLock')
+);
 const Databases = React.lazy(
   () => import(/* webpackChunkName: "databases" */ './Databases')
 );
@@ -332,7 +335,7 @@ export class FeatureLocks implements TeleportFeature {
   route = {
     title: 'Session & Identity Locks',
     path: cfg.routes.locks,
-    exact: false,
+    exact: true,
     component: Locks,
   };
 
@@ -348,6 +351,19 @@ export class FeatureLocks implements TeleportFeature {
       return cfg.getLocksRoute(clusterId);
     },
   };
+}
+
+export class FeatureNewLock implements TeleportFeature {
+  route = {
+    title: 'Create New Lock',
+    path: cfg.routes.newLock,
+    exact: true,
+    component: NewLock,
+  };
+
+  hasAccess() {
+    return true;
+  }
 }
 
 export class FeatureDiscover implements TeleportFeature {
@@ -538,6 +554,7 @@ export function getOSSFeatures(): TeleportFeature[] {
     new FeatureRoles(),
     new FeatureAuthConnectors(),
     new FeatureLocks(),
+    new FeatureNewLock(),
     new FeatureDiscover(),
 
     // - Activity

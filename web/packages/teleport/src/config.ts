@@ -99,6 +99,7 @@ const cfg = {
     consoleSession: '/web/cluster/:clusterId/console/session/:sid',
     player: '/web/cluster/:clusterId/session/:sid', // ?recordingType=ssh|desktop|k8s&durationMs=1234
     locks: '/web/cluster/:clusterId/locks',
+    newLock: '/web/cluster/:clusterId/locks/new',
     login: '/web/login',
     loginSuccess: '/web/msg/info/login_success',
     loginErrorLegacy: '/web/msg/error/login_failed',
@@ -488,6 +489,10 @@ const cfg = {
 
   getLocksRoute(clusterId: string) {
     return generatePath(cfg.routes.locks, { clusterId });
+  },
+
+  getNewLocksRoute(clusterId: string) {
+    return generatePath(cfg.routes.newLock, { clusterId });
   },
 
   getLocksUrl(clusterId: string) {
