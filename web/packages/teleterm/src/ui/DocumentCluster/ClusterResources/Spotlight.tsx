@@ -25,6 +25,7 @@ import {
   ComponentMap,
   StyledItem,
 } from 'teleterm/ui/QuickInput/QuickInputList/QuickInputList';
+import { useSearch } from 'teleterm/ui/Search/useSearch';
 import { routing } from 'teleterm/ui/uri';
 
 export function Spotlight() {
@@ -43,59 +44,36 @@ export function Spotlight() {
     clusterCtx.changeLocation('/resources/servers');
   };
 
-  const [searchAttempt, search] = useAsync(async (inputValue: string) => {
-    // TODO: Safely escape this.
-    const searchTerms = inputValue
-      .split(/\s+/)
-      .filter(Boolean)
-      .map(term => `"${term}"`)
-      .join(',');
+  const [searchAttempt, search] = useAsync(useSearch());
 
-    const results = await Promise.all([
-      resourcesService
-        .fetchServers({
-          clusterUri: clusterCtx.clusterUri,
-          // TODO: Safely escape this.
-          query: `search(${searchTerms})`,
-          limit: 10,
-        })
-        .then(res =>
-          res.agentsList.map(server => ({
-            kind: 'suggestion.server' as const,
-            token: server.hostname,
-            data: server,
-          }))
-        ),
-      resourcesService
-        .fetchDatabases({
-          clusterUri: clusterCtx.clusterUri,
-          query: `search(${searchTerms})`,
-          limit: 10,
-        })
-        .then(res =>
-          res.agentsList.map(db => ({
-            kind: 'suggestion.database' as const,
-            token: db.name,
-            data: db,
-          }))
-        ),
-      resourcesService
-        .fetchKubes({
-          clusterUri: clusterCtx.clusterUri,
-          query: `search(${searchTerms})`,
-          limit: 10,
-        })
-        .then(res =>
-          res.agentsList.map(kube => ({
-            kind: 'suggestion.kube' as const,
-            token: kube.name,
-            data: kube,
-          }))
-        ),
-    ]);
-
-    return results.flat();
-  });
+  const suggestions =
+    searchAttempt.status !== 'success'
+      ? []
+      : searchAttempt.data.map(searchResult => {
+          switch (searchResult.kind) {
+            case 'server': {
+              return {
+                kind: 'suggestion.server' as const,
+                token: searchResult.resource.hostname,
+                data: searchResult.resource,
+              };
+            }
+            case 'database': {
+              return {
+                kind: 'suggestion.database' as const,
+                token: searchResult.resource.name,
+                data: searchResult.resource,
+              };
+            }
+            case 'kube': {
+              return {
+                kind: 'suggestion.kube' as const,
+                token: searchResult.resource.name,
+                data: searchResult.resource,
+              };
+            }
+          }
+        });
 
   return (
     <Flex flexDirection="column" alignItems="center" gap={3}>
@@ -127,7 +105,7 @@ export function Spotlight() {
             margin: 0 auto;
           `}
         >
-          {searchAttempt.data.map(item => {
+          {suggestions.map(item => {
             const Cmpt = ComponentMap[item.kind];
             const onSelect = async () => {
               const resourceUri = item.data.uri;
