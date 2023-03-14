@@ -25,18 +25,17 @@ import {
   ComponentMap,
   StyledItem,
 } from 'teleterm/ui/QuickInput/QuickInputList/QuickInputList';
-import { useWorkspaceContext } from 'teleterm/ui/Documents';
+import { routing } from 'teleterm/ui/uri';
 
 export function Spotlight() {
   const {
-    resourcesService,
     clustersService,
+    resourcesService,
     notificationsService,
+    workspacesService,
     connectionTracker,
   } = useAppContext();
-  const { documentsService, rootClusterUri } = useWorkspaceContext();
   clustersService.useState();
-  const rootCluster = clustersService.findCluster(rootClusterUri);
   const clusterCtx = useClusterContext();
   const refInput = useRef<HTMLInputElement>();
 
@@ -132,6 +131,9 @@ export function Spotlight() {
             const Cmpt = ComponentMap[item.kind];
             const onSelect = async () => {
               const resourceUri = item.data.uri;
+              const rootClusterUri = routing.ensureRootClusterUri(resourceUri);
+              const documentsService =
+                workspacesService.getWorkspaceDocumentService(rootClusterUri);
 
               const connectionToReuse =
                 connectionTracker.findConnectionByResourceUri(resourceUri);
@@ -141,14 +143,20 @@ export function Spotlight() {
                 return;
               }
 
+              await workspacesService.setActiveWorkspace(rootClusterUri);
+
               switch (item.kind) {
                 case 'suggestion.server': {
                   const server = item.data;
                   const doc = documentsService.createTshNodeDocument(
                     server.uri
                   );
-                  const username = rootCluster.loggedInUser?.name;
-                  const login = rootCluster.loggedInUser?.sshLoginsList.find(
+                  const rootCluster = clustersService.findClusterByResource(
+                    server.uri
+                  );
+                  // Filer out username for testing purposes.
+                  const username = rootCluster?.loggedInUser?.name;
+                  const login = rootCluster?.loggedInUser?.sshLoginsList.find(
                     login => login !== username
                   );
                   if (!login) {
@@ -166,7 +174,7 @@ export function Spotlight() {
                 }
                 case 'suggestion.database': {
                   const db = item.data;
-                  const users = await clustersService.getDbUsers(db.uri);
+                  const users = await resourcesService.getDbUsers(db.uri);
                   const user = users[0];
 
                   if (!user) {
@@ -187,6 +195,7 @@ export function Spotlight() {
                   break;
                 }
                 case 'suggestion.kube': {
+                  // TODO: Use correct cluster to connect kube.
                   clusterCtx.connectKube(item.data.uri);
                   return;
                 }
