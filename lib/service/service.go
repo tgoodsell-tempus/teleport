@@ -46,6 +46,7 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/jonboulle/clockwork"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/siddontang/go/log"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/attribute"
@@ -65,6 +66,7 @@ import (
 	"github.com/gravitational/teleport/api/types"
 	apievents "github.com/gravitational/teleport/api/types/events"
 	apiutils "github.com/gravitational/teleport/api/utils"
+	"github.com/gravitational/teleport/api/utils/retryutils"
 	"github.com/gravitational/teleport/lib/auditd"
 	"github.com/gravitational/teleport/lib/auth"
 	"github.com/gravitational/teleport/lib/auth/keygen"
@@ -118,6 +120,8 @@ import (
 	"github.com/gravitational/teleport/lib/system"
 	"github.com/gravitational/teleport/lib/utils"
 	"github.com/gravitational/teleport/lib/utils/cert"
+	"github.com/gravitational/teleport/lib/utils/interval"
+	mw "github.com/gravitational/teleport/lib/versioncontrol/maintenancewindow"
 	"github.com/gravitational/teleport/lib/web"
 )
 
@@ -316,6 +320,9 @@ type TeleportProcess struct {
 
 	// inventoryHandle is the downstream inventory control handle for this instance.
 	inventoryHandle inventory.DownstreamHandle
+
+	// mwExporter is the maintenance window exporter (used to export scheduling info to external upgraders).
+	mwExporter mw.Exporter
 
 	// instanceClient is the instance-level auth client. this is created asynchronously
 	// and may not exist for some time if cert migrations are necessary.
@@ -957,6 +964,10 @@ func NewTeleport(cfg *servicecfg.Config) (*TeleportProcess, error) {
 			process.log.Warnf("Failed to respond to inventory ping (id=%d): %v", ping.ID, err)
 		}
 	})
+
+	if upgraderKind := os.Getenv("TELEPORT_UNSTABLE_UPGRADER"); upgraderKind != "" {
+		process.initMaintenanceWindowExporter(upgraderKind)
+	}
 
 	serviceStarted := false
 
@@ -2665,6 +2676,67 @@ func (process *TeleportProcess) initMetricsService() error {
 
 	process.BroadcastEvent(Event{Name: MetricsReady, Payload: nil})
 	return nil
+}
+
+func (process *TeleportProcess) initMaintenanceWindowExporter(upgraderKind string) error {
+	// TODO(fspmarshall): try to move as much of the meaningful logic here to
+	// vc/mw as possible in order to make testing easier.
+	const unhealthyThreshold = time.Minute * 9
+	process.mwExporter, err = mw.NewExporter(upgraderKind)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	// TODO(fspmarshall): rework interval to allow faster retry on err
+	exportInterval := interval.New(interval.Config{
+		FirstDuration: utils.FullJitter(unhealthyThreshold),
+		Duration:      time.Minute * 60,
+		Jitter:        retryutils.NewSeventhJitter(),
+	})
+
+	process.registerFunc("maintenancewindow.export", func() error {
+	Outer:
+		for {
+			select {
+			case sender := <-process.inventoryHandle.Sender():
+				for {
+					select {
+					case <-exportInterval.Next():
+						clt := process.getInstanceClient()
+						if clt == nil {
+							log.Warnf("Cannot export maintenance window (instance client unavailable)", err)
+							continue
+						}
+
+						rsp, err := clt.ExportMaintenanceWindows(ctx, proto.ExportMaintenanceWindowsRequest{
+							TeleportVersion: teleport.Version,
+							UpgraderKind:    upgraderKind,
+						})
+
+						if err != nil {
+							log.Warnf("Failed to get exported maintenance windows: %v", err)
+							continue
+						}
+
+						if err := process.mwExporter.Export(process.ExitContext(), rsp); err != nil {
+							log.Warnf("Failed to export maintenance window shedule: %v", err)
+						}
+					case <-sender.Done():
+						continue Outer
+					case <-process.ExitContext().Done():
+						return nil
+					}
+				}
+			case <-time.After(unhealthyThreshold):
+				log.Warnf("Inventory control stream has been down for longer than %v, resetting exported maintenance window.", unhealthyThreshold)
+				if err := process.mwExporter.Reset(process.ExitContext()); err != nil {
+					log.Warnf("Failed to reset exported maintenance window: %v", err)
+				}
+			case <-process.ExitContext().Done():
+				return nil
+			}
+		}
+	})
 }
 
 // initDiagnosticService starts diagnostic service currently serving healthz
