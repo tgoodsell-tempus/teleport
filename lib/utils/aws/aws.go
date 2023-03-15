@@ -364,13 +364,13 @@ func BuildRoleARN(username, region, accountID string) (string, error) {
 	if !strings.HasPrefix(resource, "role/") {
 		resource = fmt.Sprintf("role/%s", username)
 	}
-	roleARN := arn.ARN{
+	roleARN := &arn.ARN{
 		Partition: partition,
 		Service:   iam.ServiceName,
 		AccountID: accountID,
 		Resource:  resource,
 	}
-	if err := checkRoleARN(&roleARN); err != nil {
+	if err := checkRoleARN(roleARN); err != nil {
 		return "", trace.Wrap(err)
 	}
 	return roleARN.String(), nil

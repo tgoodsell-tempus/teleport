@@ -23,6 +23,7 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	gcpcredentialspb "cloud.google.com/go/iam/credentials/apiv1/credentialspb"
@@ -235,7 +236,7 @@ func (a *dbAuth) GetRedshiftServerlessAuthToken(ctx context.Context, sessionCtx 
 	// mapped to a Postgres user "IAMR:my-role-name" inside the database. So we
 	// first need to assume this IAM role before getting auth token.
 	meta := sessionCtx.Database.GetAWS()
-	roleARN, err := awsutils.BuildRoleARN(sessionCtx.DatabaseUser, meta.Region, meta.AccountID)
+	roleARN, err := redshiftServerlessUsernameToRoleARN(meta, sessionCtx.DatabaseUser)
 	if err != nil {
 		return "", "", trace.Wrap(err)
 	}
@@ -817,4 +818,16 @@ func matchAzureResourceName(resourceID, name string) bool {
 	}
 
 	return parsedResource.Name == name
+}
+
+// redshiftServerlessUsernameToRoleARN converts a database username to AWS role
+// ARN for a Redshift Serverless database.
+func redshiftServerlessUsernameToRoleARN(meta types.AWS, username string) (string, error) {
+	// These are in-database usernames created when logged in as IAM
+	// users/roles. We will enforce Teleport users to provide IAM roles
+	// instead.
+	if strings.HasPrefix(username, "IAM:") || strings.HasPrefix(username, "IAMR:") {
+		return "", trace.BadParameter("expecting name or ARN of an AWS IAM role but got %v", username)
+	}
+	return awsutils.BuildRoleARN(username, meta.Region, meta.AccountID)
 }
