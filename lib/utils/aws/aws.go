@@ -360,19 +360,20 @@ func BuildRoleARN(username, region, accountID string) (string, error) {
 		}
 		return username, nil
 	}
-	if accountID == "" {
-		return "", trace.BadParameter("cannot build AWS IAM role ARN because AWS account ID is not specified")
-	}
 	resource := username
-	if !strings.Contains(resource, "/") {
+	if !strings.HasPrefix(resource, "role/") {
 		resource = fmt.Sprintf("role/%s", username)
 	}
-	return arn.ARN{
+	roleARN := arn.ARN{
 		Partition: partition,
 		Service:   iam.ServiceName,
 		AccountID: accountID,
 		Resource:  resource,
-	}.String(), nil
+	}
+	if err := checkRoleARN(&roleARN); err != nil {
+		return "", trace.Wrap(err)
+	}
+	return roleARN.String(), nil
 }
 
 // ValidateRoleARNAndExtractRoleName validates the role ARN and extracts the
@@ -393,19 +394,28 @@ func ValidateRoleARNAndExtractRoleName(roleARN, wantPartition, wantAccountID str
 func ParseRoleARN(roleARN string) (*arn.ARN, error) {
 	role, err := arn.Parse(roleARN)
 	if err != nil {
-		return nil, trace.Wrap(err, "%q is not a valid AWS IAM role ARN", roleARN)
+		return nil, trace.BadParameter("invalid AWS ARN: %v", err)
 	}
-	if !IsRoleARN(&role) {
-		return nil, trace.BadParameter("%q is not an AWS IAM role ARN", roleARN)
+	if err := checkRoleARN(&role); err != nil {
+		return nil, trace.Wrap(err)
 	}
 	return &role, nil
 }
 
-// IsRoleARN returns whether a parsed ARN is for an IAM Role resource.
+// checkRoleARN returns whether a parsed ARN is for an IAM Role resource.
 // Example role ARN: arn:aws:iam::123456789012:role/some-role-name
-func IsRoleARN(parsed *arn.ARN) bool {
+func checkRoleARN(parsed *arn.ARN) error {
 	parts := strings.Split(parsed.Resource, "/")
-	return len(parts) >= 2 && parts[0] == "role" && parsed.Service == "iam"
+	if parts[0] != "role" || parsed.Service != "iam" {
+		return trace.BadParameter("%q is not an AWS IAM role ARN", parsed)
+	}
+	if len(parts) < 2 {
+		return trace.BadParameter("%q is missing AWS IAM role name", parsed)
+	}
+	if err := apiawsutils.IsValidAccountID(parsed.AccountID); err != nil {
+		return trace.BadParameter("%q invalid account ID: %v", parsed, err)
+	}
+	return nil
 }
 
 // CheckARNPartitionAndAccount checks an AWS ARN against an expected AWS partition and account ID.
