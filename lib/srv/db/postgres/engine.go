@@ -286,7 +286,7 @@ func (e *Engine) provisionUser(ctx context.Context, sessionCtx *common.Session) 
 		return trace.Wrap(err)
 	}
 
-	_, err = conn.Exec(ctx, `call teleport_create_user($1, '{}'::varchar[])`, databaseUser)
+	_, err = conn.Exec(ctx, `call teleport_create_user($1, $2)`, databaseUser, []string{"testrole", "asd"})
 	if err != nil {
 		return trace.Wrap(err)
 	}
