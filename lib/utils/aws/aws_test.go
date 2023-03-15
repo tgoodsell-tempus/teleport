@@ -302,11 +302,11 @@ func TestParseRoleARN(t *testing.T) {
 func TestBuildRoleARN(t *testing.T) {
 	t.Parallel()
 	tests := map[string]struct {
-		user      string
-		region    string
-		accountID string
-		wantErr   string
-		wantARN   string
+		user            string
+		region          string
+		accountID       string
+		wantErrContains string
+		wantARN         string
 	}{
 		"valid role arn in correct partition and account": {
 			user:      "arn:aws:iam::123456789012:role/test-role",
@@ -345,34 +345,34 @@ func TestBuildRoleARN(t *testing.T) {
 			wantARN:   "arn:aws-cn:iam::123456789012:role/test-role",
 		},
 		"valid ARN is not an IAM role ARN": {
-			user:      "arn:aws:iam::123456789012:user/test-user",
-			region:    "",
-			accountID: "",
-			wantErr:   "not an AWS IAM role",
+			user:            "arn:aws:iam::123456789012:user/test-user",
+			region:          "",
+			accountID:       "",
+			wantErrContains: "not an AWS IAM role",
 		},
 		"valid role arn in different partition": {
-			user:      "arn:aws-cn:iam::123456789012:role/test-role",
-			region:    "us-west-1",
-			accountID: "",
-			wantErr:   `expected AWS partition "aws" but got "aws-cn"`,
+			user:            "arn:aws-cn:iam::123456789012:role/test-role",
+			region:          "us-west-1",
+			accountID:       "",
+			wantErrContains: `expected AWS partition "aws" but got "aws-cn"`,
 		},
 		"valid role arn in different account": {
-			user:      "arn:aws:iam::123456789012:role/test-role",
-			region:    "us-west-1",
-			accountID: "111222333444",
-			wantErr:   `expected AWS account ID "111222333444" but got "123456789012"`,
+			user:            "arn:aws:iam::123456789012:role/test-role",
+			region:          "us-west-1",
+			accountID:       "111222333444",
+			wantErrContains: `expected AWS account ID "111222333444" but got "123456789012"`,
 		},
 		"role name with invalid account characters": {
-			user:      "test-role",
-			region:    "",
-			accountID: "12345678901f",
-			wantErr:   "must be 12-digit",
+			user:            "test-role",
+			region:          "",
+			accountID:       "12345678901f",
+			wantErrContains: "must be 12-digit",
 		},
 		"role name with invalid account id length": {
-			user:      "test-role",
-			region:    "",
-			accountID: "1234567890123",
-			wantErr:   "must be 12-digit",
+			user:            "test-role",
+			region:          "",
+			accountID:       "1234567890123",
+			wantErrContains: "must be 12-digit",
 		},
 	}
 
@@ -381,9 +381,9 @@ func TestBuildRoleARN(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got, err := BuildRoleARN(tt.user, tt.region, tt.accountID)
-			if tt.wantErr != "" {
+			if tt.wantErrContains != "" {
 				require.Error(t, err)
-				require.ErrorContains(t, err, tt.wantErr)
+				require.ErrorContains(t, err, tt.wantErrContains)
 				return
 			}
 			require.NoError(t, err)
