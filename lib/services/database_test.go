@@ -516,7 +516,6 @@ func TestDatabaseFromRDSInstance(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	// TODO(gavin): everywhere we test creating a db from something, pass assume role just to verify it populates metadata.
 	actual, err := NewDatabaseFromRDSInstance(instance, AssumeRole{
 		RoleARN:    "arn:aws:iam::123456789012:role/DBDiscoverer",
 		ExternalID: "externalid123",

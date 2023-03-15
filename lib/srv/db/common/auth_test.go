@@ -396,8 +396,7 @@ func TestGetAzureIdentityResourceIDCache(t *testing.T) {
 	require.Equal(t, identityResourceID(t, "identity"), resourceID)
 }
 
-// TODO(gavin): rename this test i guess.
-func TestCrossAccountAWSAuthTokens(t *testing.T) {
+func TestAuthGetAWSTokenWithAssumedRole(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
