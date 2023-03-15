@@ -2379,19 +2379,21 @@ func (h *Handler) getClusterLocks(
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-
 	// Lock data structure is reformatted to save doing it on the client as the
 	// Table component doesn't support nested complex objects.
 	lockList := make([]UILock, 0)
 	for i := 0; i < len(locks); i++ {
+		expires := ""
+		if locks[i].LockExpiry() != nil {
+			expires = locks[i].LockExpiry().Format(time.RFC3339Nano)
+		}
 		lockList = append(lockList, UILock{
-			locks[i].GetMetadata().Name,
-			locks[i].Message(),
-			locks[i].LockExpiry().Format(time.RFC3339Nano),
-			locks[i].Target(),
+			Name:    locks[i].GetMetadata().Name,
+			Message: locks[i].Message(),
+			Expires: expires,
+			Targets: locks[i].Target(),
 		})
 	}
-
 	return lockList, nil
 }
 
