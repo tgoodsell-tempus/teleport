@@ -64,31 +64,33 @@ a new certificate for each user's identity.
 ## Details
 
 The Proxy will authenticate to the Kube Service and any remote Teleport proxy using its
-certificate. The proxy certificate does not contain any user identification
+certificate. The certificate used by proxy does not contain any user identification
 and it's signed by the Teleport CA. The proxy will then forward the user's identity
-using HTTP headers or Proxy Protocol extensions (one or the other, not both).
+using HTTP headers or gRPC metadata instead of generating a new certificate on
+the behalf of the user. Since the proxy is authenticated using its certificate,
+the upstream service can trust the identity received in the request headers.
 
 This change will remove the requirement for the proxy to generate a new certificate
 and thus call auth's `ProcessKubeCSR` endpoint to sign the key-pair containing the
 user's identity.
 
-Here we present two options for forwarding the user's identity:
 
-### Option 1: Impersonation: Forward user identity using HTTP headers
+### Impersonation: Forward user identity using HTTP headers
 
 As opposed to the majority of protocols supported by Teleport, the Kubernetes protocol
 is based on HTTP 1/2. This allows us to forward the user's identity using HTTP headers
 for the specific case of Kubernetes.
 
 The proposed solution is to use the Proxy certificate to authenticate to the upstream
-service and to forward the user's identity using HTTP headers for later Impersonation.
+service and to forward the user's identity using HTTP headers or gRPC metadata
+for later Impersonation.
 
-Once the upstream service receives a request, it will check the proxy certificate
-to validate the request's provenance and its role - making sure it's proxy - for
+Once the upstream service receives a request, it will check the certificate provided
+to validate the request's provenance and its role - making sure it's a proxy - for
 authenticating the request. Once authenticated, it will impersonate the identity
-contained in the request HTTP headers. After trusting the identity received,
-the upstream service will impersonate the identity in a similar way to when the
-user connects to the proxy or the Kube Service.
+contained in the request headers. This impersonated identity will be available in
+`authz.Context` and services won't be able to distinguish between a request forwarded
+by the proxy or a request made directly by the user.
 
 This approach is similar to what Kubernetes API does when
 forwarding requests to the API server using Impersonation. In the Teleport case, we must
@@ -100,6 +102,11 @@ to the request headers before forwarding it to the upstream service.
 ```go
 headers["TELEPORT_IMPERSONATE_IDENTITY"] = clientCert.Subject
 ```
+
+In order to prevent the user from tampering with the headers, the authorization
+layer will delete the headers after checking if the request originated in a proxy,
+so the user cannot send the headers directly and the proxy forwards them
+to the upstream service.
 
 Besides the security benefits, this option also has the advantage of allowing us to
 reuse the same connection to forward multiple requests from different users. It happens
@@ -115,21 +122,6 @@ This option requires sending the user's IP address to the upstream service
 using a header instead of the protocol extension implemented by [TLS IP Pinning RFD](https://github.com/gravitational/teleport/pull/22481).
 This is because the connection is reused and the IP address is not available
 in the connection prelude since the connection does not belong to a specific user/request.
-
-#### Option 2: Forward user identity using Proxy Protocol extensions
-
-Similarly to the [TLS IP Pinning RFD](https://github.com/gravitational/teleport/pull/22481),
-Teleport Proxy will forward the user's identity using Proxy Protocol extensions. This
-means that the Teleport proxy will send the user's identity to the upstream service when dialing
-the connection. The upstream service will then be able to extract the user's identity
-from the connection prelude and use it to authorize the request.
-
-As opposed to the HTTP header option, this option doesn't require sending the user's IP
-because it's already included in another Proxy Protocol extension.
-
-This option requires a new connection per request because the Proxy Protocol
-extensions are sent when the connection is established. This means that
-we cannot reuse the connection to forward multiple requests from different users.
 
 ## Rollout plan
 
@@ -189,3 +181,25 @@ it's easy to introduce major security vulnerabilities.
 Since the proxy will send the same Identity to the upstream service that it
 received from the client, the upstream service will be able to trust the user's identity
 and there is no possibility of the proxy forwarding the wrong identity.
+
+
+## Other solutions considered
+
+This section describes other solutions considered for forwarding the user's identity
+to the upstream service but were discarded because they either didn't provide
+the same security guarantees.
+
+#### Forward user identity using Proxy Protocol extensions
+
+Similarly to the [TLS IP Pinning RFD](https://github.com/gravitational/teleport/pull/22481),
+Teleport Proxy will forward the user's identity using Proxy Protocol extensions. This
+means that the Teleport proxy will send the user's identity to the upstream service when dialing
+the connection. The upstream service will then be able to extract the user's identity
+from the connection prelude and use it to authorize the request.
+
+As opposed to the HTTP header option, this option doesn't require sending the user's IP
+because it's already included in another Proxy Protocol extension.
+
+This option requires a new connection per request because the Proxy Protocol
+extensions are sent when the connection is established. This means that
+we cannot reuse the connection to forward multiple requests from different users.
