@@ -1064,7 +1064,6 @@ type AWSSessionCacheKeyBuilder struct {
 	roleCount int
 }
 
-// TODO(gavin): test cache key builder.
 // NewAWSSessionCacheKeyBuilder constructs a new cache key builder intialized
 // with a specific AWS region.
 func NewAWSSessionCacheKeyBuilder(region string) AWSSessionCacheKeyBuilder {
@@ -1089,7 +1088,6 @@ func (c *AWSSessionCacheKeyBuilder) String() string {
 	return c.sb.String()
 }
 
-// TODO(gavin): test filter
 // filterAssumeRoles is a helper function that filters out roles that have an empty role ARN.
 func filterAssumeRoles(roles []services.AssumeRole) []services.AssumeRole {
 	if len(roles) == 0 {
@@ -1104,14 +1102,13 @@ func filterAssumeRoles(roles []services.AssumeRole) []services.AssumeRole {
 	return filteredRoles
 }
 
-// TODO(gavin): test check assume role chain.
 // checkAssumeRoleChain checks a chain of AWS IAM roles for obvious errors that
 // would return an error from AWS API.
 // "obvious" errors include:
 //   - ARN fails to parse, or is not an IAM Role.
-//   - a role is in a different partition than the next role.
-//   - a role is in a different account than the next role and does not have
-//     an external ID.
+//   - a role is in a different partition than the given region.
+//   - a role is in a different account than the next role and the next role
+//     does not have an external ID.
 func checkAssumeRoleChain(region string, roles []services.AssumeRole) error {
 	if len(roles) == 0 {
 		return nil
@@ -1130,12 +1127,8 @@ func checkAssumeRoleChain(region string, roles []services.AssumeRole) error {
 		ARNs = append(ARNs, parsed)
 	}
 	for i := 0; i < len(ARNs)-1; i++ {
-		if ARNs[i].AccountID != ARNs[i+1].AccountID && roles[i].ExternalID == "" {
-			return trace.BadParameter("%v cannot assume %v without an external ID",
-				roles[i].RoleARN, roles[i+1].RoleARN)
-		}
-		if ARNs[i].Partition != ARNs[i+1].Partition {
-			return trace.BadParameter("%v cannot assume %v across AWS partitions",
+		if ARNs[i].AccountID != ARNs[i+1].AccountID && roles[i+1].ExternalID == "" {
+			return trace.BadParameter("%v cannot assume external account role %v without an external ID",
 				roles[i].RoleARN, roles[i+1].RoleARN)
 		}
 	}
