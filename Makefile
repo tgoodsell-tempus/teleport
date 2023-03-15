@@ -437,12 +437,14 @@ ifeq ($(ENVIRONMENT_NAME),promote)
   DEVELOPER_KEY_NAME = Developer ID Application: Ada Lin
   INSTALLER_KEY_NAME = Developer ID Installer: Ada Lin
   TEAMID = QH8AA5B8UP
+  TELEPORT_BUNDLEID = com.gravitational.teleport
   TSH_BUNDLEID = $(TEAMID).com.gravitational.teleport.tsh
   TSH_SKELETON = tsh
 else ifeq ($(ENVIRONMENT_NAME),build)
   DEVELOPER_KEY_NAME = Developer ID Application: Ada Lin
   INSTALLER_KEY_NAME = Developer ID Installer: Ada Lin
   TEAMID = K497G57PDJ
+  TELEPORT_BUNDLEID = com.goteleport.dev
   TSH_BUNDLEID = $(TEAMID).com.goteleport.tshdev
   TSH_SKELETON = tshdev
 else
@@ -455,7 +457,7 @@ DEVELOPER_ID_APPLICATION = $(call get_key_id,$(DEVELOPER_KEY_NAME))
 DEVELOPER_ID_INSTALLER = $(call get_key_id,$(INSTALLER_KEY_NAME))
 
 # Export vars as they are used by the build.assets/build-package.sh script
-export DEVELOPER_ID_APPLICATION DEVELOPER_ID_INSTALLER TEAMID TSH_BUNDLEID TSH_SKELETON
+export DEVELOPER_ID_APPLICATION DEVELOPER_ID_INSTALLER TEAMID TELEPORT_BUNDLEID TSH_BUNDLEID TSH_SKELETON
 
 .PHONY: release-darwin-unsigned
 release-darwin-unsigned: RELEASE:=$(RELEASE)-unsigned
@@ -468,7 +470,10 @@ release-darwin: release-darwin-unsigned
 	if [ -n "$$APPLE_USERNAME" -a -n "$$APPLE_PASSWORD" ]; then \
 		cd ./build.assets/tooling/ && \
 		go run ./cmd/notarize-apple-binaries/*.go \
-			--log-level=debug $(ABSOLUTE_BINARY_PATHS); \
+			--developer-id=$(DEVELOPER_ID_APPLICATION) \
+			--bundle-id=$(TELEPORT_BUNDLEID) \
+			--log-level=debug \
+			$(ABSOLUTE_BINARY_PATHS); \
 	fi
 	$(MAKE) build-archive
 	@if [ -f e/Makefile ]; then $(MAKE) -C e release; fi
