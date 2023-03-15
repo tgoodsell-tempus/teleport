@@ -433,20 +433,26 @@ release-unix: clean full build-archive
 # TSH_SKELETON is a directory name relative to build.assets/macos/
 ENVIRONMENT_NAME ?= build
 ifeq ($(ENVIRONMENT_NAME),promote)
-  DEVELOPER_ID_APPLICATION = 0FFD3E3413AB4C599C53FBB1D8CA690915E33D83
-  DEVELOPER_ID_INSTALLER = 82B625AD327C241B378A54B4B254BB08CE71B5DF
+  # TODO(camh): Verify key names for production keys
+  DEVELOPER_KEY_NAME = Developer ID Application: Ada Lin
+  INSTALLER_KEY_NAME = Developer ID Installer: Ada Lin
   TEAMID = QH8AA5B8UP
   TSH_BUNDLEID = $(TEAMID).com.gravitational.teleport.tsh
   TSH_SKELETON = tsh
 else ifeq ($(ENVIRONMENT_NAME),build)
-  DEVELOPER_ID_APPLICATION = A5604F285B0957134EA099AC515BD9E0787228AC
-  DEVELOPER_ID_INSTALLER = C1A831A974DF69563432C87A4979F7982DD91FBE
+  DEVELOPER_KEY_NAME = Developer ID Application: Ada Lin
+  INSTALLER_KEY_NAME = Developer ID Installer: Ada Lin
   TEAMID = K497G57PDJ
   TSH_BUNDLEID = $(TEAMID).com.goteleport.tshdev
   TSH_SKELETON = tshdev
 else
   $(error Unknown ENVIRONMENT_NAME: $(ENVIRONMENT_NAME))
 endif
+
+# Extract application/installer key ID from keychain
+get_key_id = $(word 2,$(shell security find-identity -s codesigning | grep --fixed-strings --max-count=1 '$(1)'))
+DEVELOPER_ID_APPLICATION = $(call get_key_id,$(DEVELOPER_KEY_NAME))
+DEVELOPER_ID_INSTALLER = $(call get_key_id,$(INSTALLER_KEY_NAME))
 
 # Export vars as they are used by the build.assets/build-package.sh script
 export DEVELOPER_ID_APPLICATION DEVELOPER_ID_INSTALLER TEAMID TSH_BUNDLEID TSH_SKELETON
