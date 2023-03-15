@@ -289,7 +289,7 @@ func TestCA(t *testing.T) {
 	ca.SetResourceID(out.GetResourceID())
 	require.Empty(t, cmp.Diff(ca, out))
 
-	err = p.trustS.DeleteCertAuthority(ca.GetID())
+	err = p.trustS.DeleteCertAuthority(ctx, ca.GetID())
 	require.NoError(t, err)
 
 	select {
@@ -398,7 +398,7 @@ func TestWatchers(t *testing.T) {
 	// as we upsert it and delete it
 	filteredCa := suite.NewTestCA(types.HostCA, "example.net")
 	require.NoError(t, p.trustS.UpsertCertAuthority(filteredCa))
-	require.NoError(t, p.trustS.DeleteCertAuthority(filteredCa.GetID()))
+	require.NoError(t, p.trustS.DeleteCertAuthority(ctx, filteredCa.GetID()))
 
 	select {
 	case e := <-w.Events():
@@ -482,7 +482,7 @@ func TestNodeCAFiltering(t *testing.T) {
 	// upsert and delete a local host CA, we expect to see a Put and a Delete event
 	localCA := suite.NewTestCA(types.HostCA, "example.com")
 	require.NoError(t, p.trustS.UpsertCertAuthority(localCA))
-	require.NoError(t, p.trustS.DeleteCertAuthority(localCA.GetID()))
+	require.NoError(t, p.trustS.DeleteCertAuthority(ctx, localCA.GetID()))
 
 	ev := fetchEvent()
 	require.Equal(t, types.OpPut, ev.Type)
@@ -497,7 +497,7 @@ func TestNodeCAFiltering(t *testing.T) {
 	// upsert and delete a nonlocal host CA, we expect to only see the Delete event
 	nonlocalCA := suite.NewTestCA(types.HostCA, "example.net")
 	require.NoError(t, p.trustS.UpsertCertAuthority(nonlocalCA))
-	require.NoError(t, p.trustS.DeleteCertAuthority(nonlocalCA.GetID()))
+	require.NoError(t, p.trustS.DeleteCertAuthority(ctx, nonlocalCA.GetID()))
 
 	ev = fetchEvent()
 	require.Equal(t, types.OpDelete, ev.Type)
@@ -507,7 +507,7 @@ func TestNodeCAFiltering(t *testing.T) {
 	// whereas we expect to see the Put and Delete for a trusted *user* CA
 	trustedUserCA := suite.NewTestCA(types.UserCA, "example.net")
 	require.NoError(t, p.trustS.UpsertCertAuthority(trustedUserCA))
-	require.NoError(t, p.trustS.DeleteCertAuthority(trustedUserCA.GetID()))
+	require.NoError(t, p.trustS.DeleteCertAuthority(ctx, trustedUserCA.GetID()))
 
 	ev = fetchEvent()
 	require.Equal(t, types.OpPut, ev.Type)
@@ -1794,6 +1794,40 @@ func TestUserGroups(t *testing.T) {
 		},
 		update:    p.userGroups.UpdateUserGroup,
 		deleteAll: p.userGroups.DeleteAllUserGroups,
+	})
+}
+
+// TestLocks tests that CRUD operations on lock resources are
+// replicated from the backend to the cache.
+func TestLocks(t *testing.T) {
+	t.Parallel()
+
+	p := newTestPack(t, ForAuth)
+	t.Cleanup(p.Close)
+
+	testResources(t, p, testFuncs[types.Lock]{
+		newResource: func(name string) (types.Lock, error) {
+			return types.NewLock(
+				name,
+				types.LockSpecV2{
+					Target: types.LockTarget{
+						Role: "target-role",
+					},
+				},
+			)
+		},
+		create: p.accessS.UpsertLock,
+		list: func(ctx context.Context) ([]types.Lock, error) {
+			results, err := p.accessS.GetLocks(ctx, false)
+			return results, err
+		},
+		cacheGet: p.cache.GetLock,
+		cacheList: func(ctx context.Context) ([]types.Lock, error) {
+			results, err := p.cache.GetLocks(ctx, false)
+			return results, err
+		},
+		update:    p.accessS.UpsertLock,
+		deleteAll: p.accessS.DeleteAllLocks,
 	})
 }
 
