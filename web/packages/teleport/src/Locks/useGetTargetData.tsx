@@ -34,8 +34,13 @@ export const useGetTargetData: UseGetTargetData = (
   additionalTargets
 ) => {
   const [targetData, setTargetData] = useState<TableData[]>();
-  const { userService, resourceService, nodeService, mfaService } =
-    useTeleport();
+  const {
+    desktopService,
+    mfaService,
+    nodeService,
+    resourceService,
+    userService,
+  } = useTeleport();
 
   useEffect(() => {
     const targetDataFilters = {
@@ -87,6 +92,18 @@ export const useGetTargetData: UseGetTargetData = (
           setter(filteredData);
         },
       },
+      windows_desktop: {
+        fetch: desktopService.fetchDesktops,
+        handler: (setter, desktops) => {
+          const filteredData = desktops.agents.map(d => ({
+            name: d.name,
+            addr: d.addr,
+            labels: d.labels.map(l => `${l.name}:${l.value}`).join(', '),
+          }));
+          setter(filteredData);
+        },
+        options: [clusterId, { limit: 10 }],
+      },
     };
 
     let action =
@@ -103,6 +120,7 @@ export const useGetTargetData: UseGetTargetData = (
   }, [
     additionalTargets,
     clusterId,
+    desktopService.fetchDesktops,
     mfaService.fetchDevices,
     nodeService.fetchNodes,
     resourceService.fetchRoles,

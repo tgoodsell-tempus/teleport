@@ -97,6 +97,10 @@ function TargetList({ data, selectedTarget }: TargetListProps) {
     return <Box>Listing Devices not implemented.</Box>;
   }
 
+  if (selectedTarget === 'login') {
+    return <Box>Unable to list logins, use quick add box.</Box>;
+  }
+
   const columns = data.length
     ? Object.keys(data[0]).map(c => ({
         key: c,
