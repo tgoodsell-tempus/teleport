@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 
-import { Box, ButtonPrimary, Flex, Text, Input } from 'design';
+import { Box, ButtonPrimary, Flex, Input } from 'design';
 import Select from 'shared/components/Select';
 import Table, { Cell } from 'design/DataTable';
 
-import useTeleport from 'teleport/useTeleport';
 import useStickyClusterId from 'teleport/useStickyClusterId';
 
 import {
@@ -30,105 +29,33 @@ import {
   FeatureHeaderTitle,
 } from 'teleport/components/Layout';
 
-type TableData = {
-  [key: string]: string;
-};
+import { lockTargets, useGetTargetData } from './useGetTargetData';
 
-const useGetTargetData = (targetType: AllowedTargets, clusterId: string) => {
-  const [targetData, setTargetData] = useState<TableData[]>();
-  const { userService, resourceService, nodeService, mfaService } =
-    useTeleport();
+import type { AdditionalTargets } from './useGetTargetData';
+import type { AllowedTargets, LockTarget, TableData } from './types';
 
-  useEffect(() => {
-    switch (targetType) {
-      case 'user':
-        userService.fetchUsers().then(users => {
-          const filteredData = users.map(u => ({
-            name: u.name,
-            roles: u.roles.join(', '),
-          }));
-          setTargetData(filteredData);
-        });
-        break;
-      case 'role':
-        resourceService.fetchRoles().then(roles => {
-          const filteredData = roles.map(r => ({
-            name: r.name,
-          }));
-          setTargetData(filteredData);
-        });
-        break;
-      case 'node':
-        nodeService
-          .fetchNodes(clusterId, {
-            limit: 10,
-          })
-          .then(nodes => {
-            const filteredData = nodes.agents.map(n => ({
-              hostname: n.hostname,
-              addr: n.addr,
-              labels: n.labels.join(', '),
-            }));
-            setTargetData(filteredData);
-          });
-        break;
-      case 'mfa_device':
-        mfaService.fetchDevices().then(mfas => {
-          const filteredData = mfas.map(m => ({
-            name: m.name,
-            id: m.id,
-            description: m.description,
-            lastUsed: m.lastUsedDate.toUTCString(),
-          }));
-          setTargetData(filteredData);
-        });
-        break;
-    }
-  }, [
-    clusterId,
-    mfaService,
-    nodeService,
-    resourceService,
-    targetType,
-    userService,
-  ]);
-
-  return targetData;
-};
-
-type AllowedTargets =
-  | 'user'
-  | 'role'
-  | 'login'
-  | 'node'
-  | 'mfa_device'
-  | 'windows_desktop'
-  | 'access_request'
-  | 'device';
-
-type LockTarget = {
-  label: string;
-  value: AllowedTargets;
-};
-
-const lockTargets: LockTarget[] = [
-  { label: 'User', value: 'user' },
-  { label: 'Role', value: 'role' },
-  { label: 'Login', value: 'login' },
-  { label: 'Node', value: 'node' },
-  { label: 'MFA Device', value: 'mfa_device' },
-  { label: 'Windows Desktop', value: 'windows_desktop' },
-  { label: 'Access Request', value: 'access_request' },
-  { label: 'Device', value: 'device' },
-];
-
+// This is split out like this to allow the router to call 'NewLock'
+// but also allow E to use 'NewLockContent' separately.
 export default function NewLock() {
+  return <NewLockContent />;
+}
+
+export function NewLockContent({
+  additionalTargets,
+}: {
+  additionalTargets?: AdditionalTargets;
+}) {
   const [selectedTargetType, setSelectedTargetType] = useState<LockTarget>({
     label: 'User',
     value: 'user',
   });
   const { clusterId } = useStickyClusterId();
-  const targetData = useGetTargetData(selectedTargetType?.value, clusterId);
+
+  const targetData = useGetTargetData(
+    selectedTargetType?.value,
+    clusterId,
+    additionalTargets
+  );
 
   return (
     <FeatureBox>
@@ -167,7 +94,7 @@ function TargetList({ data, selectedTarget }: TargetListProps) {
   if (!data) data = [];
 
   if (selectedTarget === 'device') {
-    return <Box>Not Implemented</Box>;
+    return <Box>Listing Devices not implemented.</Box>;
   }
 
   const columns = data.length
