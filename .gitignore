@@ -5,6 +5,9 @@ debug
 default.etcd
 /darwin
 
+# Hermit
+/.hermit/
+
 # web asset directory
 /lib/web/build
 
