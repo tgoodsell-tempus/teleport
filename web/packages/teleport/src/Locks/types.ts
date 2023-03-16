@@ -16,3 +16,8 @@ export type LockTarget = {
   label: string;
   value: AllowedTargets;
 };
+
+export type SelectedLockTarget = {
+  type: AllowedTargets;
+  name: string;
+};

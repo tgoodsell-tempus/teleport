@@ -17,7 +17,7 @@ limitations under the License.
 import React, { useState } from 'react';
 import styled from 'styled-components';
 
-import { Box, ButtonPrimary, Flex, Input } from 'design';
+import { Box, ButtonPrimary, Flex, Input, Text } from 'design';
 import Select from 'shared/components/Select';
 import Table, { Cell } from 'design/DataTable';
 
@@ -32,7 +32,13 @@ import {
 import { lockTargets, useGetTargetData } from './useGetTargetData';
 
 import type { AdditionalTargets } from './useGetTargetData';
-import type { AllowedTargets, LockTarget, TableData } from './types';
+import type {
+  AllowedTargets,
+  LockTarget,
+  SelectedLockTarget,
+  TableData,
+} from './types';
+import type { TableColumn } from 'design/DataTable/types';
 
 // This is split out like this to allow the router to call 'NewLock'
 // but also allow E to use 'NewLockContent' separately.
@@ -45,17 +51,28 @@ export function NewLockContent({
 }: {
   additionalTargets?: AdditionalTargets;
 }) {
+  const { clusterId } = useStickyClusterId();
   const [selectedTargetType, setSelectedTargetType] = useState<LockTarget>({
     label: 'User',
     value: 'user',
   });
-  const { clusterId } = useStickyClusterId();
+  const [selectedLockTargets, setSelectedLockTargets] = useState<
+    SelectedLockTarget[]
+  >([]);
 
   const targetData = useGetTargetData(
     selectedTargetType?.value,
     clusterId,
     additionalTargets
   );
+
+  function onAdd(name) {
+    selectedLockTargets.push({
+      type: selectedTargetType.value,
+      name,
+    });
+    setSelectedLockTargets([...selectedLockTargets]);
+  }
 
   return (
     <FeatureBox>
@@ -74,7 +91,50 @@ export function NewLockContent({
         </Box>
         <QuickAdd targetType={selectedTargetType.label} />
       </Flex>
-      <TargetList data={targetData} selectedTarget={selectedTargetType.value} />
+      <TargetList
+        data={targetData}
+        onAdd={onAdd}
+        selectedTarget={selectedTargetType.value}
+      />
+      <Flex
+        data-testid="selected-locks"
+        alignItems="center"
+        justifyContent="space-between"
+        borderRadius={3}
+        p={3}
+        mt={4}
+        css={`
+          background: ${({ theme }) => theme.colors.primary.main};
+        `}
+      >
+        {selectedLockTargets.length > 0 ? (
+          <StyledTable
+            data={selectedLockTargets}
+            columns={[
+              {
+                key: 'type',
+                headerText: 'Type',
+                isSortable: false,
+              },
+              {
+                key: 'name',
+                headerText: 'Name',
+                isSortable: false,
+              },
+            ]}
+            emptyText="No Targets Found"
+          />
+        ) : (
+          <Box>
+            <Text>Add lock targets to create lock.</Text>
+          </Box>
+        )}
+      </Flex>
+      <Flex justifyContent="flex-end" mt={4}>
+        <ButtonPrimary width="182px" onClick={() => {}} disabled={false}>
+          Lock targets
+        </ButtonPrimary>
+      </Flex>
     </FeatureBox>
   );
 }
@@ -87,10 +147,11 @@ const StyledTable = styled(Table)`
 
 type TargetListProps = {
   data: TableData[];
+  onAdd: (name: string) => void;
   selectedTarget: AllowedTargets;
 };
 
-function TargetList({ data, selectedTarget }: TargetListProps) {
+function TargetList({ data, selectedTarget, onAdd }: TargetListProps) {
   if (!data) data = [];
 
   if (selectedTarget === 'device') {
@@ -101,13 +162,20 @@ function TargetList({ data, selectedTarget }: TargetListProps) {
     return <Box>Unable to list logins, use quick add box.</Box>;
   }
 
-  const columns = data.length
+  const columns: TableColumn<any>[] = data.length
     ? Object.keys(data[0]).map(c => ({
         key: c,
         headerText: c,
         isSortable: true,
       }))
     : [];
+
+  if (columns.length) {
+    columns.push({
+      altKey: 'add-btn',
+      render: ({ name }) => <AddCell onAdd={onAdd.bind(null, name)} />,
+    });
+  }
   return (
     <StyledTable data={data} columns={columns} emptyText="No Targets Found" />
   );
@@ -117,12 +185,20 @@ function QuickAdd({ targetType }: { targetType: string }) {
   return (
     <Flex
       justifyContent="flex-end"
-      alignItems="baseline"
+      alignItems="center"
       css={{ columnGap: '20px' }}
       mb={4}
     >
       <Input placeholder={`Quick add ${targetType}`} width={500} />
-      <ButtonPrimary>Add</ButtonPrimary>
+      <ButtonPrimary>+ Add</ButtonPrimary>
     </Flex>
   );
 }
+
+const AddCell = ({ onAdd }: { onAdd: () => void }) => {
+  return (
+    <Cell align="right">
+      <ButtonPrimary onClick={onAdd}>+ Add</ButtonPrimary>
+    </Cell>
+  );
+};
