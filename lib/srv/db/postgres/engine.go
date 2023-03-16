@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/gravitational/trace"
 	"github.com/jackc/pgconn"
@@ -215,14 +216,32 @@ func (e *Engine) checkAccess(ctx context.Context, sessionCtx *common.Session) er
 	return nil
 }
 
-var sp1 = `
-create or replace procedure teleport_create_user(username varchar, roles varchar[])
+// var sp1 = `
+// create or replace procedure teleport_create_user(username varchar, roles varchar[])
+// language plpgsql
+// as $$
+// declare
+//     role_ varchar;
+// begin
+//     execute format('create user %I', username);
+//     foreach role_ in array roles
+//     loop
+//         execute format('grant %I to %I', role_, username);
+//     end loop;
+// end;$$;
+// `
+
+var sp1 = `create or replace procedure teleport_create_user(username varchar, roles varchar[])
 language plpgsql
 as $$
 declare
     role_ varchar;
 begin
-    execute format('create user %I', username);
+    if exists (select * from pg_catalog.pg_auth_members where roleid = (select oid from pg_catalog.pg_roles where rolname = 'teleport') and member = (select oid from pg_catalog.pg_roles where rolname = username)) then
+        execute format('alter user %I with login', username);
+    else
+        execute format('create user %I in role teleport', username);
+    end if;
     foreach role_ in array roles
     loop
         execute format('grant %I to %I', role_, username);
@@ -230,14 +249,20 @@ begin
 end;$$;
 `
 
-var storedProcedure = `create or replace procedure teleport_delete_%v()
+var storedProcedure = `create or replace procedure teleport_delete_user(username varchar, roles varchar[])
 language plpgsql
 as $$
+declare
+    role_ varchar;
 begin
-    if exists (select usename from pg_stat_activity where usename = '%v') then
+    if exists (select usename from pg_stat_activity where usename = username) then
         raise notice 'User has active connections';
     else
-        drop user %v;
+    	foreach role_ in array roles
+	    loop
+        	execute format('revoke %I from %I', role_, username);
+	    end loop;
+        execute format('alter user %I with nologin', username);
     end if;
 end;$$;
 `
@@ -258,7 +283,7 @@ func (e *Engine) provisionUser(ctx context.Context, sessionCtx *common.Session) 
 		return common.ConvertConnectError(err, sessionCtx)
 	}
 	defer conn.Close(ctx)
-	_, err = conn.Exec(ctx, fmt.Sprintf(storedProcedure, databaseUser, databaseUser, databaseUser))
+	_, err = conn.Exec(ctx, storedProcedure)
 	if err != nil {
 		return trace.Wrap(err)
 	}
@@ -266,7 +291,7 @@ func (e *Engine) provisionUser(ctx context.Context, sessionCtx *common.Session) 
 	// if err = result.Close(); err != nil {
 	// 	return trace.Wrap(err)
 	// }
-	e.Log.Infof("Created stored procedure teleport_delete_%v", databaseUser)
+	e.Log.Infof("Created stored procedure teleport_delete_user")
 	_, err = conn.Exec(ctx, sp1)
 	if err != nil {
 		return trace.Wrap(err)
@@ -286,8 +311,12 @@ func (e *Engine) provisionUser(ctx context.Context, sessionCtx *common.Session) 
 		return trace.Wrap(err)
 	}
 
-	_, err = conn.Exec(ctx, `call teleport_create_user($1, $2)`, databaseUser, []string{"testrole", "asd"})
+	_, err = conn.Exec(ctx, `call teleport_create_user($1, $2)`, databaseUser, []string{"testrole"})
 	if err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			e.Log.Infof("PostgreSQL user %v already exists.", databaseUser)
+			return nil
+		}
 		return trace.Wrap(err)
 	}
 
@@ -312,17 +341,19 @@ func (e *Engine) deprovisionUser(ctx context.Context, sessionCtx *common.Session
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	conn, err := pgconn.ConnectConfig(ctx, config)
+	pgxConf, _ := pgx.ParseConfig("")
+	pgxConf.Config = *config
+	conn, err := pgx.ConnectConfig(ctx, pgxConf)
+	// conn, err := pgconn.ConnectConfig(ctx, config)
 	if err != nil {
 		return common.ConvertConnectError(err, sessionCtx)
 	}
 	defer conn.Close(ctx)
-	// result := conn.Exec(ctx, fmt.Sprintf("drop role if exists %v", databaseUser))
-	result := conn.Exec(ctx, fmt.Sprintf("call teleport_delete_%v()", databaseUser))
-	if err = result.Close(); err != nil {
+	_, err = conn.Exec(ctx, `call teleport_delete_user($1, $2)`, databaseUser, []string{"testrole"})
+	if err != nil {
 		return trace.Wrap(err)
 	}
-	e.Log.Infof("Deleted Postgres user %v.", databaseUser)
+	e.Log.Infof("Disabled Postgres user %v.", databaseUser)
 	return nil
 }
 
