@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import Table, { Cell } from 'design/DataTable';
 import { ButtonPrimary } from 'design/Button';
@@ -51,21 +51,31 @@ type Lock = {
 export function useLocks(clusterId: string) {
   const [locks, setLocks] = useState<Lock[]>([]);
 
-  useEffect(() => {
+  const fetchLocks = useCallback(() => {
     api.get(cfg.getLocksUrl(clusterId)).then(resp => {
       setLocks(resp);
     });
   }, [clusterId]);
 
-  return locks;
+  useEffect(() => {
+    fetchLocks();
+  }, [fetchLocks]);
+
+  return { locks, fetchLocks };
 }
 
 export function Locks() {
   const { clusterId } = useStickyClusterId();
-  const lockData = useLocks(clusterId);
+  const { locks, fetchLocks } = useLocks(clusterId);
 
   function onDelete(lockName: string) {
-    console.log('deleting', lockName);
+    api.delete(cfg.getLocksUrlWithUUID(clusterId, lockName)).then(() => {
+      // It takes longer for the cache to be updated when removing locks so
+      // this waits 1s before fetching the list again.
+      setTimeout(() => {
+        fetchLocks();
+      }, 1000);
+    });
   }
 
   return (
@@ -81,7 +91,7 @@ export function Locks() {
         </ButtonPrimary>
       </FeatureHeader>
       <Table
-        data={lockData}
+        data={locks}
         columns={[
           {
             altKey: 'targets[type]',
@@ -115,7 +125,9 @@ export function Locks() {
           },
           {
             altKey: 'options-btn',
-            render: ({ name }) => <ManageCell onDelete={onDelete.bind(name)} />,
+            render: ({ name }) => (
+              <ManageCell onDelete={onDelete.bind(null, name)} />
+            ),
           },
         ]}
         emptyText="No Locks Found"

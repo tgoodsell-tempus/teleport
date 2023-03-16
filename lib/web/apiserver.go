@@ -2454,7 +2454,7 @@ func (h *Handler) deleteClusterLock(
 		return nil, trace.Wrap(err)
 	}
 
-	return nil, nil
+	return OK(), nil
 }
 
 // siteNodeConnect connect to the site node
