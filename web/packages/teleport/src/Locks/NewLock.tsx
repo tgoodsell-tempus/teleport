@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import styled from 'styled-components';
 
 import { Box, ButtonPrimary, Flex, Input, Text } from 'design';
@@ -29,14 +29,17 @@ import {
   FeatureHeaderTitle,
 } from 'teleport/components/Layout';
 
+import { useLocks } from './Locks';
+
 import { lockTargets, useGetTargetData } from './useGetTargetData';
 
 import type { AdditionalTargets } from './useGetTargetData';
 import type {
-  AllowedTargets,
+  CreateLockData,
   LockTarget,
+  OnAdd,
   SelectedLockTarget,
-  TableData,
+  TargetListProps,
 } from './types';
 import type { TableColumn } from 'design/DataTable/types';
 
@@ -51,7 +54,10 @@ export function NewLockContent({
 }: {
   additionalTargets?: AdditionalTargets;
 }) {
+  const messageRef = useRef<HTMLInputElement>(null);
+  const ttlRef = useRef<HTMLInputElement>(null);
   const { clusterId } = useStickyClusterId();
+  const { createLock } = useLocks(clusterId);
   const [selectedTargetType, setSelectedTargetType] = useState<LockTarget>({
     label: 'User',
     value: 'user',
@@ -59,7 +65,6 @@ export function NewLockContent({
   const [selectedLockTargets, setSelectedLockTargets] = useState<
     SelectedLockTarget[]
   >([]);
-
   const targetData = useGetTargetData(
     selectedTargetType?.value,
     clusterId,
@@ -73,6 +78,21 @@ export function NewLockContent({
     });
     setSelectedLockTargets([...selectedLockTargets]);
   }
+
+  function handleCreateLock() {
+    selectedLockTargets.forEach(lockTarget => {
+      const lockData: CreateLockData = {
+        targets: { [lockTarget.type]: lockTarget.name },
+      };
+      const message = messageRef?.current?.value;
+      const ttl = ttlRef?.current?.value;
+      if (message) lockData.message = message;
+      if (ttl) lockData.ttl = ttl;
+      createLock(clusterId, lockData);
+    });
+  }
+
+  const disabledSubmit = !selectedLockTargets.length;
 
   return (
     <FeatureBox>
@@ -130,11 +150,30 @@ export function NewLockContent({
           </Box>
         )}
       </Flex>
-      <Flex justifyContent="flex-end" mt={4}>
+      <Flex
+        justifyContent="flex-end"
+        mt={4}
+        alignItems="center"
+        css={{ columnGap: '20px' }}
+      >
+        <Text>Message: </Text>
+        <Input
+          placeholder={`Going down for maintenance`}
+          width={500}
+          disabled={disabledSubmit}
+          ref={messageRef}
+        />
+        <Text>TTL: </Text>
+        <Input
+          placeholder={`5h`}
+          width={75}
+          disabled={disabledSubmit}
+          ref={ttlRef}
+        />
         <ButtonPrimary
           width="182px"
-          onClick={() => {}}
-          disabled={!selectedLockTargets.length}
+          onClick={handleCreateLock}
+          disabled={disabledSubmit}
         >
           Lock targets
         </ButtonPrimary>
@@ -148,14 +187,6 @@ const StyledTable = styled(Table)`
     vertical-align: middle;
   }
 ` as typeof Table;
-
-type OnAdd = (name: string) => void;
-
-type TargetListProps = {
-  data: TableData[];
-  onAdd: OnAdd;
-  selectedTarget: AllowedTargets;
-};
 
 function TargetList({ data, selectedTarget, onAdd }: TargetListProps) {
   if (!data) data = [];
@@ -199,10 +230,14 @@ function QuickAdd({ targetType, onAdd }: { targetType: string; onAdd: OnAdd }) {
       <Input
         placeholder={`Quick add ${targetType}`}
         width={500}
+        value={inputValue}
         onChange={e => setInputValue(e.currentTarget.value)}
       />
       <ButtonPrimary
-        onClick={() => onAdd(inputValue)}
+        onClick={() => {
+          onAdd(inputValue);
+          setInputValue('');
+        }}
         disabled={!inputValue.length}
       >
         + Add

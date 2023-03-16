@@ -1,3 +1,19 @@
+export type Lock = {
+  name: string;
+  message: string;
+  expires: string;
+  targets: {
+    user?: string;
+    role?: string;
+    login?: string;
+    node?: string;
+    mfa_device?: string;
+    windows_desktop?: string;
+    access_request?: string;
+    device?: string;
+  };
+};
+
 export type AllowedTargets =
   | 'user'
   | 'role'
@@ -20,4 +36,18 @@ export type LockTarget = {
 export type SelectedLockTarget = {
   type: AllowedTargets;
   name: string;
+};
+
+export type OnAdd = (name: string) => void;
+
+export type TargetListProps = {
+  data: TableData[];
+  onAdd: OnAdd;
+  selectedTarget: AllowedTargets;
+};
+
+export type CreateLockData = {
+  targets: { [K in AllowedTargets]?: string };
+  message?: string;
+  ttl?: string;
 };

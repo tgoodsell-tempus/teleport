@@ -32,36 +32,29 @@ import {
 
 import { NavLink } from 'teleport/components/Router';
 
-type Lock = {
-  name: string;
-  message: string;
-  expires: string;
-  targets: {
-    user?: string;
-    role?: string;
-    login?: string;
-    node?: string;
-    mfa_device?: string;
-    windows_desktop?: string;
-    access_request?: string;
-    device?: string;
-  };
-};
+import type { CreateLockData, Lock } from './types';
 
 export function useLocks(clusterId: string) {
   const [locks, setLocks] = useState<Lock[]>([]);
 
-  const fetchLocks = useCallback(() => {
+  const fetchLocks = useCallback((clusterId: string) => {
     api.get(cfg.getLocksUrl(clusterId)).then(resp => {
       setLocks(resp);
     });
-  }, [clusterId]);
+  }, []);
+
+  const createLock = useCallback(
+    (clusterId: string, createLockData: CreateLockData) => {
+      api.put(cfg.getLocksUrl(clusterId), createLockData);
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchLocks();
-  }, [fetchLocks]);
+    fetchLocks(clusterId);
+  }, [clusterId, fetchLocks]);
 
-  return { locks, fetchLocks };
+  return { createLock, fetchLocks, locks };
 }
 
 export function Locks() {
@@ -73,7 +66,7 @@ export function Locks() {
       // It takes longer for the cache to be updated when removing locks so
       // this waits 1s before fetching the list again.
       setTimeout(() => {
-        fetchLocks();
+        fetchLocks(clusterId);
       }, 1000);
     });
   }

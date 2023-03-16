@@ -2420,10 +2420,24 @@ func (h *Handler) createClusterLock(
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+	var ttlDuration time.Duration
+	if req.TTL != "" {
+		ttlDuration, err = time.ParseDuration(req.TTL)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+	}
+
+	var ttl *time.Time = nil
+	if ttlDuration != 0 {
+		t := time.Now().UTC().Add(ttlDuration)
+		ttl = &t
+	}
 
 	lock, err := types.NewLock(uuid.New().String(), types.LockSpecV2{
 		Target:  req.Targets,
 		Message: req.Message,
+		Expires: ttl,
 	})
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -2434,7 +2448,7 @@ func (h *Handler) createClusterLock(
 		return nil, trace.Wrap(err)
 	}
 
-	return nil, nil
+	return lock, nil
 }
 
 func (h *Handler) deleteClusterLock(
