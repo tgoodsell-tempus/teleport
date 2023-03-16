@@ -89,7 +89,7 @@ export function NewLockContent({
             onChange={(o: LockTarget) => setSelectedTargetType(o)}
           />
         </Box>
-        <QuickAdd targetType={selectedTargetType.label} />
+        <QuickAdd targetType={selectedTargetType.label} onAdd={onAdd} />
       </Flex>
       <TargetList
         data={targetData}
@@ -131,7 +131,11 @@ export function NewLockContent({
         )}
       </Flex>
       <Flex justifyContent="flex-end" mt={4}>
-        <ButtonPrimary width="182px" onClick={() => {}} disabled={false}>
+        <ButtonPrimary
+          width="182px"
+          onClick={() => {}}
+          disabled={!selectedLockTargets.length}
+        >
           Lock targets
         </ButtonPrimary>
       </Flex>
@@ -145,9 +149,11 @@ const StyledTable = styled(Table)`
   }
 ` as typeof Table;
 
+type OnAdd = (name: string) => void;
+
 type TargetListProps = {
   data: TableData[];
-  onAdd: (name: string) => void;
+  onAdd: OnAdd;
   selectedTarget: AllowedTargets;
 };
 
@@ -181,7 +187,8 @@ function TargetList({ data, selectedTarget, onAdd }: TargetListProps) {
   );
 }
 
-function QuickAdd({ targetType }: { targetType: string }) {
+function QuickAdd({ targetType, onAdd }: { targetType: string; onAdd: OnAdd }) {
+  const [inputValue, setInputValue] = useState<string>('');
   return (
     <Flex
       justifyContent="flex-end"
@@ -189,8 +196,17 @@ function QuickAdd({ targetType }: { targetType: string }) {
       css={{ columnGap: '20px' }}
       mb={4}
     >
-      <Input placeholder={`Quick add ${targetType}`} width={500} />
-      <ButtonPrimary>+ Add</ButtonPrimary>
+      <Input
+        placeholder={`Quick add ${targetType}`}
+        width={500}
+        onChange={e => setInputValue(e.currentTarget.value)}
+      />
+      <ButtonPrimary
+        onClick={() => onAdd(inputValue)}
+        disabled={!inputValue.length}
+      >
+        + Add
+      </ButtonPrimary>
     </Flex>
   );
 }

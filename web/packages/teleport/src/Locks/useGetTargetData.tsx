@@ -67,7 +67,7 @@ export const useGetTargetData: UseGetTargetData = (
         fetch: nodeService.fetchNodes,
         handler: (setter, nodes) => {
           const filteredData = nodes.agents.map(n => ({
-            hostname: n.hostname,
+            name: n.hostname,
             addr: n.addr,
             labels: n.labels.join(', '),
           }));
