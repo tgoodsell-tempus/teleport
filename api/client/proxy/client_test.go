@@ -375,7 +375,6 @@ func (f *fakeProxy) clientConfig(t *testing.T) ClientConfig {
 	return ClientConfig{
 		ProxyWebAddress: "127.0.0.1",
 		ProxySSHAddress: "127.0.0.1",
-		ClusterName:     "test",
 		SSHDialer: SSHDialerFunc(func(ctx context.Context, network string, addr string, config *ssh.ClientConfig) (*tracessh.Client, error) {
 			conn, chans, reqs, err := f.fakeSSHServer.newClientConn()
 			if err != nil {
