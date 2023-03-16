@@ -22,12 +22,13 @@ import Select from 'shared/components/Select';
 import Table, { Cell } from 'design/DataTable';
 
 import useStickyClusterId from 'teleport/useStickyClusterId';
-
+import history from 'teleport/services/history';
 import {
   FeatureBox,
   FeatureHeader,
   FeatureHeaderTitle,
 } from 'teleport/components/Layout';
+import cfg from 'teleport/config';
 
 import { useLocks } from './Locks';
 
@@ -86,7 +87,7 @@ export function NewLockContent({
   }
 
   function handleCreateLock() {
-    selectedLockTargets.forEach(lockTarget => {
+    selectedLockTargets.forEach(async lockTarget => {
       const lockData: CreateLockData = {
         targets: { [lockTarget.type]: lockTarget.name },
       };
@@ -94,8 +95,13 @@ export function NewLockContent({
       const ttl = ttlRef?.current?.value;
       if (message) lockData.message = message;
       if (ttl) lockData.ttl = ttl;
-      createLock(clusterId, lockData);
+      await createLock(clusterId, lockData);
     });
+    setTimeout(() => {
+      // It takes longer for the cache to be updated when adding locks so
+      // this waits 1s before redirecting to fetch the list again.
+      history.push(cfg.getLocksRoute(clusterId));
+    }, 1000);
   }
 
   const disabledSubmit = !selectedLockTargets.length;

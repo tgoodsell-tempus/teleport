@@ -44,8 +44,8 @@ export function useLocks(clusterId: string) {
   }, []);
 
   const createLock = useCallback(
-    (clusterId: string, createLockData: CreateLockData) => {
-      api.put(cfg.getLocksUrl(clusterId), createLockData);
+    async (clusterId: string, createLockData: CreateLockData) => {
+      await api.put(cfg.getLocksUrl(clusterId), createLockData);
     },
     []
   );
