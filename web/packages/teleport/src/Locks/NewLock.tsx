@@ -79,6 +79,12 @@ export function NewLockContent({
     setSelectedLockTargets([...selectedLockTargets]);
   }
 
+  function onRemove(name) {
+    const index = selectedLockTargets.findIndex(target => target.name === name);
+    selectedLockTargets.splice(index, 1);
+    setSelectedLockTargets([...selectedLockTargets]);
+  }
+
   function handleCreateLock() {
     selectedLockTargets.forEach(lockTarget => {
       const lockData: CreateLockData = {
@@ -140,6 +146,12 @@ export function NewLockContent({
                 key: 'name',
                 headerText: 'Name',
                 isSortable: false,
+              },
+              {
+                altKey: 'remove-btn',
+                render: ({ name }) => (
+                  <BtnCell cb={onRemove.bind(null, name)}>- Remove</BtnCell>
+                ),
               },
             ]}
             emptyText="No Targets Found"
@@ -210,7 +222,9 @@ function TargetList({ data, selectedTarget, onAdd }: TargetListProps) {
   if (columns.length) {
     columns.push({
       altKey: 'add-btn',
-      render: ({ name }) => <AddCell onAdd={onAdd.bind(null, name)} />,
+      render: ({ name }) => (
+        <BtnCell cb={onAdd.bind(null, name)}>+ Add</BtnCell>
+      ),
     });
   }
   return (
@@ -246,10 +260,16 @@ function QuickAdd({ targetType, onAdd }: { targetType: string; onAdd: OnAdd }) {
   );
 }
 
-const AddCell = ({ onAdd }: { onAdd: () => void }) => {
+const BtnCell = ({
+  cb,
+  children,
+}: {
+  cb: () => void;
+  children: React.ReactNode;
+}) => {
   return (
     <Cell align="right">
-      <ButtonPrimary onClick={onAdd}>+ Add</ButtonPrimary>
+      <ButtonPrimary onClick={cb}>{children}</ButtonPrimary>
     </Cell>
   );
 };
