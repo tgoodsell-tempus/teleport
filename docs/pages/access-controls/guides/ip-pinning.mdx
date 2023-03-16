@@ -1,0 +1,112 @@
+---
+title: "IP Pinning (Preview)"
+description: How to enable IP pinning for Teleport users
+---
+
+<Admonition type="warning">
+IP Pinning is currently in Preview mode.
+
+IP Pinning requires Teleport Enterprise.
+</Admonition>
+
+IP Pinning is a security feature that helps protect against unauthorized access by ensuring that 
+Teleport users can only access resources from the IP address they used during the login process. 
+This helps minimize the risk of compromised credentials being used from different locations.
+
+The IP pinning preview currently supports the
+following Teleport features:
+
+- SSH access 
+- Database access 
+- Kubernetes access 
+
+Support for other access features is planned for upcoming Teleport versions.
+
+## How it works
+<Admonition type="note">
+  **Observed IP** - IP of the client as seen by the Teleport systems. It can be taken from the direct connection of
+  the user or given by load balancer through PROXY protocol if it's enabled.
+
+  **Pinned IP** - IP of the client, observed during login process and embedded into user's certificates.
+</Admonition>
+
+When IP pinning is enabled for at least one of a user's roles, the IP address observed by Teleport during the login process will
+ be embedded into the user's certificates. Later, whenever the user attempts to access Teleport resources, the system will compare 
+ the observed IP address with the pinned IP address stored in the certificate. If the IP addresses do not match, access will be denied.
+
+If user's role requires IP pinning, but user's certificate that is presented to a Teleport service doesn't have pinned IP information embedded,
+access will be denied. It means if you enable IP pinning for some role, any already logged in user with that role will have to re-login in
+order to regenerate their certificates. Client's observed IP will be propagated internally between Teleport services
+ if needed, so IP pinning check could be performed against correct IP.
+
+IP pinning can work across trusted clusters, but be aware that if user tries to access leaf cluster's resources through root cluster, and their
+mapped role on the leaf cluster has IP pinning enabled, they should also have IP pinning enabled on their root cluster roles, in order for their 
+certificates to contain pinned IP information.
+
+## Prerequisites
+
+(!docs/pages/includes/commercial-prereqs-tabs.mdx!)
+
+## Configure IP Pinning
+
+To enable IP pinning, update the role to contain `pin_source_ip` option:
+
+```yaml
+kind: role
+version: v6
+metadata:
+  name: example-role-with-ip-pinning
+spec:
+  options:
+    # require IP pinning for this role
+    pin_source_ip: true
+  allow:
+    ...
+  deny:
+    ...
+```
+
+
+### Role example
+
+Let's walk through an example of setting up IP pinning for a role.
+
+Teleport admin adds a role that enforces IP pinning for users.
+
+```yaml
+# pinned-ip.yaml
+kind: role
+version: v6
+metadata:
+  name: pinned-ip
+spec:
+  options:
+    pin_source_ip: true
+```
+Admin assigns this role to the user Alice, who then logs into Teleport using the 'tsh' command and tries 
+to access a node from the same IP address she logged in with.
+
+```code
+$ curl ifconfig.me
+
+# 198.51.111.1
+
+$ tsh ssh telenode.example.com
+
+# alice@telenode.example.com >
+```
+
+It is successful and isn't different from any other time Alice accessed a node.
+
+Later, Alice changes her IP address, and her attempt to access the same node will fail due to the IP address mismatch.
+This will trigger the relogin process, prompting Alice to authenticate again.
+
+```code
+$ curl ifconfig.me
+
+# 198.51.222.2
+
+$ tsh ssh telenode.example.com
+
+# Enter password for Teleport user alice:
+```
