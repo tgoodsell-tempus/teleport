@@ -20,6 +20,7 @@ import styled from 'styled-components';
 import { Box, ButtonPrimary, Flex, Input, Text } from 'design';
 import Select from 'shared/components/Select';
 import Table, { Cell } from 'design/DataTable';
+import { ArrowBack } from 'design/Icon';
 
 import useStickyClusterId from 'teleport/useStickyClusterId';
 import history from 'teleport/services/history';
@@ -110,7 +111,15 @@ export function NewLockContent({
     <FeatureBox>
       <FeatureHeader>
         <FeatureHeaderTitle>
-          Session & Identity Locks / Create New Lock
+          <Flex alignItems="center">
+            <ArrowBack
+              fontSize={25}
+              mr={3}
+              onClick={() => history.push(cfg.getLocksRoute(clusterId))}
+              style={{ cursor: 'pointer' }}
+            />
+            <Box>Create New Lock</Box>
+          </Flex>
         </FeatureHeaderTitle>
       </FeatureHeader>
       <Flex justifyContent="space-between">
