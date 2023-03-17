@@ -262,13 +262,13 @@ function Labels(props: { searchResult: types.SearchResult }) {
 function Label(props: { searchResult: types.SearchResult; label: tsh.Label }) {
   const { searchResult, label } = props;
   const labelMatches = searchResult.labelMatches.filter(
-    match => match.matchedValue.labelName == label.name
+    match => match.labelName == label.name
   );
   const nameMatches = labelMatches
-    .filter(match => match.matchedValue.kind === 'label-name')
+    .filter(match => match.kind === 'label-name')
     .map(match => match.searchTerm);
   const valueMatches = labelMatches
-    .filter(match => match.matchedValue.kind === 'label-value')
+    .filter(match => match.kind === 'label-value')
     .map(match => match.searchTerm);
 
   return (
