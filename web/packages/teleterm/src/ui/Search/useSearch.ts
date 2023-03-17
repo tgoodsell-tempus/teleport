@@ -52,7 +52,10 @@ export function sortResults(
   searchResults: SearchResult[],
   search: string
 ): SearchResult[] {
-  const terms = search.split(' ').filter(Boolean);
+  const terms = search
+    .split(' ')
+    .filter(Boolean)
+    .map(term => term.toLowerCase());
 
   // Highest score first.
   // TODO: Add displayed name as the tie breaker.
@@ -69,8 +72,8 @@ function populateMatches(
 
   terms.forEach(term => {
     searchResult.resource.labelsList.forEach(label => {
-      const nameIndex = label.name.indexOf(term);
-      const valueIndex = label.value.indexOf(term);
+      const nameIndex = label.name.toLowerCase().indexOf(term);
+      const valueIndex = label.value.toLowerCase().indexOf(term);
 
       if (nameIndex >= 0) {
         labelMatches.push({
