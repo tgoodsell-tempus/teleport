@@ -17,10 +17,11 @@ limitations under the License.
 import React, { useRef, useState } from 'react';
 import styled from 'styled-components';
 
-import { Box, ButtonPrimary, Flex, Input, Text } from 'design';
+import { Box, ButtonPrimary, ButtonSecondary, Flex, Input, Text } from 'design';
 import Select from 'shared/components/Select';
 import Table, { Cell } from 'design/DataTable';
 import { ArrowBack } from 'design/Icon';
+import SlidePanel from 'design/SlidePanel';
 
 import useStickyClusterId from 'teleport/useStickyClusterId';
 import history from 'teleport/services/history';
@@ -44,6 +45,7 @@ import type {
   TargetListProps,
 } from './types';
 import type { TableColumn } from 'design/DataTable/types';
+import type { Positions } from 'design/SlidePanel/SlidePanel';
 
 // This is split out like this to allow the router to call 'NewLock'
 // but also allow E to use 'NewLockContent' separately.
@@ -60,6 +62,8 @@ export function NewLockContent({
   const ttlRef = useRef<HTMLInputElement>(null);
   const { clusterId } = useStickyClusterId();
   const { createLock } = useLocks(clusterId);
+  const [submitPanelPosition, setSubmitPanelPosition] =
+    useState<Positions>('closed');
   const [selectedTargetType, setSelectedTargetType] = useState<LockTarget>({
     label: 'User',
     value: 'user',
@@ -87,6 +91,10 @@ export function NewLockContent({
     setSelectedLockTargets([...selectedLockTargets]);
   }
 
+  function onClear() {
+    setSelectedLockTargets([]);
+  }
+
   function handleCreateLock() {
     selectedLockTargets.forEach(async lockTarget => {
       const lockData: CreateLockData = {
@@ -109,6 +117,16 @@ export function NewLockContent({
 
   return (
     <FeatureBox>
+      <SlidePanel
+        position={submitPanelPosition}
+        closePanel={() => setSubmitPanelPosition('closed')}
+      >
+        <div>
+          <ButtonPrimary onClick={() => setSubmitPanelPosition('closed')}>
+            Close
+          </ButtonPrimary>
+        </div>
+      </SlidePanel>
       <FeatureHeader>
         <FeatureHeaderTitle>
           <Flex alignItems="center">
@@ -148,62 +166,28 @@ export function NewLockContent({
           background: ${({ theme }) => theme.colors.primary.main};
         `}
       >
-        {selectedLockTargets.length > 0 ? (
-          <StyledTable
-            data={selectedLockTargets}
-            columns={[
-              {
-                key: 'type',
-                headerText: 'Type',
-                isSortable: false,
-              },
-              {
-                key: 'name',
-                headerText: 'Name',
-                isSortable: false,
-              },
-              {
-                altKey: 'remove-btn',
-                render: ({ name }) => (
-                  <BtnCell cb={onRemove.bind(null, name)}>- Remove</BtnCell>
-                ),
-              },
-            ]}
-            emptyText="No Targets Found"
-          />
-        ) : (
-          <Box>
-            <Text>Add lock targets to create lock.</Text>
-          </Box>
-        )}
-      </Flex>
-      <Flex
-        justifyContent="flex-end"
-        mt={4}
-        alignItems="center"
-        css={{ columnGap: '20px' }}
-      >
-        <Text>Message: </Text>
-        <Input
-          placeholder={`Going down for maintenance`}
-          width={500}
-          disabled={disabledSubmit}
-          ref={messageRef}
-        />
-        <Text>TTL: </Text>
-        <Input
-          placeholder={`5h`}
-          width={75}
-          disabled={disabledSubmit}
-          ref={ttlRef}
-        />
-        <ButtonPrimary
-          width="182px"
-          onClick={handleCreateLock}
-          disabled={disabledSubmit}
-        >
-          Lock targets
-        </ButtonPrimary>
+        <Box>
+          <Text>Lock targets added ({selectedLockTargets.length})</Text>
+        </Box>
+        <Box>
+          {selectedLockTargets.length > 0 && (
+            <ButtonSecondary
+              width="165px"
+              mr={3}
+              onClick={onClear}
+              disabled={disabledSubmit}
+            >
+              Clear Selections
+            </ButtonSecondary>
+          )}
+          <ButtonPrimary
+            width="165px"
+            onClick={() => setSubmitPanelPosition('open')}
+            disabled={disabledSubmit}
+          >
+            Proceed to lock
+          </ButtonPrimary>
+        </Box>
       </Flex>
     </FeatureBox>
   );
