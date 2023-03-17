@@ -16,9 +16,10 @@ limitations under the License.
 
 import React, { useCallback, useEffect, useState } from 'react';
 
-import Table, { Cell } from 'design/DataTable';
+import Table, { Cell, ClickableLabelCell } from 'design/DataTable';
 import { ButtonPrimary } from 'design/Button';
 import { MenuButton, MenuItem } from 'shared/components/MenuAction';
+import { Trash } from 'design/Icon';
 
 import api from 'teleport/services/api';
 import cfg from 'teleport/config';
@@ -32,14 +33,21 @@ import {
 
 import { NavLink } from 'teleport/components/Router';
 
-import type { CreateLockData, Lock } from './types';
+import type { CreateLockData, Lock, LockForTable } from './types';
 
 export function useLocks(clusterId: string) {
-  const [locks, setLocks] = useState<Lock[]>([]);
+  const [locks, setLocks] = useState<LockForTable[]>([]);
 
   const fetchLocks = useCallback((clusterId: string) => {
-    api.get(cfg.getLocksUrl(clusterId)).then(resp => {
-      setLocks(resp);
+    api.get(cfg.getLocksUrl(clusterId)).then((resp: Lock[]) => {
+      const locksResp = resp.map(lock => ({
+        ...lock,
+        targets: Object.entries(lock.targets).map(([key, value]) => ({
+          name: key,
+          value,
+        })),
+      }));
+      setLocks(locksResp);
     });
   }, []);
 
@@ -87,26 +95,26 @@ export function Locks() {
         data={locks}
         columns={[
           {
-            altKey: 'targets[type]',
-            headerText: 'Type',
-            isSortable: true,
-            render: ({ targets }) => {
-              const keys = Object.keys(targets);
-              return <Cell>{keys}</Cell>;
-            },
+            key: 'targets',
+            headerText: 'Locked Items',
+            render: ({ targets }) => (
+              <ClickableLabelCell labels={targets} onClick={() => {}} />
+            ),
           },
           {
-            altKey: 'targets[type] value',
-            headerText: 'Name',
+            key: 'createdBy',
+            headerText: 'Locked By',
             isSortable: true,
-            render: ({ targets }) => {
-              const entries = Object.entries(targets);
-              return <Cell>{entries.map(entry => entry[1])}</Cell>;
-            },
+          },
+          {
+            key: 'createdAt',
+            headerText: 'Start Date',
+            isSortable: true,
+            render: ({ createdAt }) => <Cell>{createdAt}</Cell>,
           },
           {
             key: 'expires',
-            headerText: 'Expires',
+            headerText: 'Expiration',
             isSortable: true,
             render: ({ expires }) => <Cell>{expires}</Cell>,
           },
@@ -119,7 +127,22 @@ export function Locks() {
           {
             altKey: 'options-btn',
             render: ({ name }) => (
-              <ManageCell onDelete={onDelete.bind(null, name)} />
+              <Cell align="right">
+                <Trash
+                  fontSize={13}
+                  borderRadius={2}
+                  p={2}
+                  onClick={onDelete.bind(null, name)}
+                  css={`
+                    cursor: pointer;
+                    background-color: #2e3860;
+                    border-radius: 2px;
+                    :hover {
+                      background-color: #414b70;
+                    }
+                  `}
+                />
+              </Cell>
             ),
           },
         ]}

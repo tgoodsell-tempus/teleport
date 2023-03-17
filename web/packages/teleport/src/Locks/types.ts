@@ -1,7 +1,11 @@
+import { LabelDescription } from 'design/DataTable/types';
+
 export type Lock = {
   name: string;
   message: string;
   expires: string;
+  createdAt: string;
+  createdBy: string;
   targets: {
     user?: string;
     role?: string;
@@ -12,6 +16,15 @@ export type Lock = {
     access_request?: string;
     device?: string;
   };
+};
+
+export type LockForTable = {
+  name: string;
+  message: string;
+  expires: string;
+  createdAt: string;
+  createdBy: string;
+  targets: LabelDescription[];
 };
 
 export type AllowedTargets =

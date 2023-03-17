@@ -18,7 +18,7 @@ import React, { useRef } from 'react';
 import SlidePanel from 'design/SlidePanel';
 
 import { ArrowBack, Trash } from 'design/Icon';
-import { Box, ButtonPrimary, ButtonSecondary, Flex, Input, Text } from 'design';
+import { Box, ButtonPrimary, Flex, Input, Text } from 'design';
 import { Cell } from 'design/DataTable';
 
 import useStickyClusterId from 'teleport/useStickyClusterId';
@@ -71,7 +71,6 @@ export function CreateLock({
   function onRemove(name) {
     const index = selectedLockTargets.findIndex(target => target.name === name);
     selectedLockTargets.splice(index, 1);
-    console.log(selectedLockTargets);
     setSelectedLockTargets([...selectedLockTargets]);
   }
 
