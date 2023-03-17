@@ -31,6 +31,12 @@ import { routing } from 'teleterm/ui/uri';
 import type * as types from 'teleterm/ui/services/resources';
 import type * as tsh from 'teleterm/services/tshd/types';
 
+const log = (msg, value) => {
+  console.log(msg, value);
+
+  return value;
+};
+
 export function Spotlight() {
   const {
     clustersService,
@@ -48,7 +54,6 @@ export function Spotlight() {
   };
 
   const [searchAttempt, search] = useAsync(useSearch());
-  console.log('searchAttempt data', searchAttempt.data);
 
   return (
     <Flex flexDirection="column" alignItems="center" gap={3}>
@@ -80,9 +85,9 @@ export function Spotlight() {
               margin: 0 auto;
             `}
           >
-            {sortResults(
-              searchAttempt.data.results,
-              searchAttempt.data.search
+            {log(
+              'useSearch sorted results',
+              sortResults(searchAttempt.data.results, searchAttempt.data.search)
             ).map(searchResult => {
               const Cmpt = ComponentMap[searchResult.kind];
               const onSelect = async () => {
@@ -185,6 +190,9 @@ const ComponentMap: Record<
 
 function ServerItem(props: { searchResult: types.SearchResultServer }) {
   const { hostname } = props.searchResult.resource;
+  const hostnameMatches = props.searchResult.resourceMatches
+    .filter(match => match.field === 'hostname')
+    .map(match => match.searchTerm);
 
   return (
     <Flex alignItems="flex-start" p={1} minWidth="300px">
@@ -193,7 +201,9 @@ function ServerItem(props: { searchResult: types.SearchResultServer }) {
       </SquareIconBackground>
       <Flex flexDirection="column" ml={1} flex={1}>
         <Flex justifyContent="space-between" alignItems="center">
-          <Box mr={2}>{hostname}</Box>
+          <Box mr={2}>
+            <Highlight text={hostname} keywords={hostnameMatches} />
+          </Box>
           <Box>
             <Text typography="body2" fontSize={0}>
               {props.searchResult.score}
