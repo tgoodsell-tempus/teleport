@@ -311,7 +311,12 @@ func (e *Engine) provisionUser(ctx context.Context, sessionCtx *common.Session) 
 		return trace.Wrap(err)
 	}
 
-	_, err = conn.Exec(ctx, `call teleport_create_user($1, $2)`, databaseUser, []string{"testrole"})
+	roles := []string{"testrole"}
+	if sessionCtx.Database.IsRDS() {
+		roles = append(roles, "rds_iam")
+	}
+
+	_, err = conn.Exec(ctx, `call teleport_create_user($1, $2)`, databaseUser, roles)
 	if err != nil {
 		if strings.Contains(err.Error(), "already exists") {
 			e.Log.Infof("PostgreSQL user %v already exists.", databaseUser)
@@ -335,7 +340,7 @@ func (e *Engine) provisionUser(ctx context.Context, sessionCtx *common.Session) 
 
 func (e *Engine) deprovisionUser(ctx context.Context, sessionCtx *common.Session) error {
 	databaseUser := sessionCtx.DatabaseUser
-	sessionCtx.DatabaseUser = "postgres"
+	sessionCtx.DatabaseUser = sessionCtx.Database.GetAdminUser()
 	defer func() { sessionCtx.DatabaseUser = databaseUser }()
 	config, err := e.getConnectConfig(ctx, sessionCtx)
 	if err != nil {
