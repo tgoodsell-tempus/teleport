@@ -14,14 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, { useRef, useState } from 'react';
-import styled from 'styled-components';
+import React, { useState } from 'react';
 
 import { Box, ButtonPrimary, ButtonSecondary, Flex, Input, Text } from 'design';
+import { Cell } from 'design/DataTable';
 import Select from 'shared/components/Select';
-import Table, { Cell } from 'design/DataTable';
 import { ArrowBack } from 'design/Icon';
-import SlidePanel from 'design/SlidePanel';
 
 import useStickyClusterId from 'teleport/useStickyClusterId';
 import history from 'teleport/services/history';
@@ -32,13 +30,13 @@ import {
 } from 'teleport/components/Layout';
 import cfg from 'teleport/config';
 
-import { useLocks } from './Locks';
+import { CreateLock } from './CreateLock';
+import { StyledTable } from './shared';
 
 import { lockTargets, useGetTargetData } from './useGetTargetData';
 
 import type { AdditionalTargets } from './useGetTargetData';
 import type {
-  CreateLockData,
   LockTarget,
   OnAdd,
   SelectedLockTarget,
@@ -58,11 +56,8 @@ export function NewLockContent({
 }: {
   additionalTargets?: AdditionalTargets;
 }) {
-  const messageRef = useRef<HTMLInputElement>(null);
-  const ttlRef = useRef<HTMLInputElement>(null);
   const { clusterId } = useStickyClusterId();
-  const { createLock } = useLocks(clusterId);
-  const [submitPanelPosition, setSubmitPanelPosition] =
+  const [createPanelPosition, setCreatePanelPosition] =
     useState<Positions>('closed');
   const [selectedTargetType, setSelectedTargetType] = useState<LockTarget>({
     label: 'User',
@@ -85,48 +80,20 @@ export function NewLockContent({
     setSelectedLockTargets([...selectedLockTargets]);
   }
 
-  function onRemove(name) {
-    const index = selectedLockTargets.findIndex(target => target.name === name);
-    selectedLockTargets.splice(index, 1);
-    setSelectedLockTargets([...selectedLockTargets]);
-  }
-
   function onClear() {
     setSelectedLockTargets([]);
-  }
-
-  function handleCreateLock() {
-    selectedLockTargets.forEach(async lockTarget => {
-      const lockData: CreateLockData = {
-        targets: { [lockTarget.type]: lockTarget.name },
-      };
-      const message = messageRef?.current?.value;
-      const ttl = ttlRef?.current?.value;
-      if (message) lockData.message = message;
-      if (ttl) lockData.ttl = ttl;
-      await createLock(clusterId, lockData);
-    });
-    setTimeout(() => {
-      // It takes longer for the cache to be updated when adding locks so
-      // this waits 1s before redirecting to fetch the list again.
-      history.push(cfg.getLocksRoute(clusterId));
-    }, 1000);
   }
 
   const disabledSubmit = !selectedLockTargets.length;
 
   return (
     <FeatureBox>
-      <SlidePanel
-        position={submitPanelPosition}
-        closePanel={() => setSubmitPanelPosition('closed')}
-      >
-        <div>
-          <ButtonPrimary onClick={() => setSubmitPanelPosition('closed')}>
-            Close
-          </ButtonPrimary>
-        </div>
-      </SlidePanel>
+      <CreateLock
+        panelPosition={createPanelPosition}
+        setPanelPosition={setCreatePanelPosition}
+        selectedLockTargets={selectedLockTargets}
+        setSelectedLockTargets={setSelectedLockTargets}
+      />
       <FeatureHeader>
         <FeatureHeaderTitle>
           <Flex alignItems="center">
@@ -182,7 +149,7 @@ export function NewLockContent({
           )}
           <ButtonPrimary
             width="165px"
-            onClick={() => setSubmitPanelPosition('open')}
+            onClick={() => setCreatePanelPosition('open')}
             disabled={disabledSubmit}
           >
             Proceed to lock
@@ -192,12 +159,6 @@ export function NewLockContent({
     </FeatureBox>
   );
 }
-
-const StyledTable = styled(Table)`
-  & > tbody > tr > td {
-    vertical-align: middle;
-  }
-` as typeof Table;
 
 function TargetList({ data, selectedTarget, onAdd }: TargetListProps) {
   if (!data) data = [];
