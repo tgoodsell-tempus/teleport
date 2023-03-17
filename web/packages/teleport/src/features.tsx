@@ -42,7 +42,7 @@ import {
   NavigationCategory,
 } from 'teleport/Navigation/categories';
 
-import type { TeleportFeature, FeatureFlags } from './types';
+import type { FeatureFlags, TeleportFeature } from './types';
 
 const Audit = React.lazy(
   () => import(/* webpackChunkName: "audit" */ './Audit')

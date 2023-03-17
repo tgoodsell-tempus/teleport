@@ -716,6 +716,8 @@ func (h *Handler) bindDefaultEndpoints() {
 	h.POST("/webapi/precapture", h.WithLimiter(h.createPreUserEventHandle))
 	// create authenticated user events.
 	h.POST("/webapi/capture", h.WithAuth(h.createUserEventHandle))
+
+	h.POST("/webapi/paymentintent", h.WithAuth(h.createPaymentIntentHandle))
 }
 
 // GetProxyClient returns authenticated auth server client

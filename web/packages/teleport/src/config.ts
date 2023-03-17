@@ -197,6 +197,8 @@ const cfg = {
 
     captureUserEventPath: '/v1/webapi/capture',
     capturePreUserEventPath: '/v1/webapi/precapture',
+
+    paymentIntent: '/v1/webapi/paymentintent'
   },
 
   getAppFqdnUrl(params: UrlAppParams) {
