@@ -237,7 +237,7 @@ as $$
 declare
     role_ varchar;
 begin
-    if exists (select * from pg_catalog.pg_auth_members where roleid = (select oid from pg_catalog.pg_roles where rolname = 'teleport') and member = (select oid from pg_catalog.pg_roles where rolname = username)) then
+    if exists (select * from pg_auth_members where roleid = (select oid from pg_roles where rolname = 'teleport') and member = (select oid from pg_roles where rolname = username)) then
         execute format('alter user %I with login', username);
     else
         execute format('create user %I in role teleport', username);
@@ -249,7 +249,7 @@ begin
 end;$$;
 `
 
-var storedProcedure = `create or replace procedure teleport_delete_user(username varchar, roles varchar[])
+var storedProcedure = `create or replace procedure teleport_delete_user(username varchar)
 language plpgsql
 as $$
 declare
@@ -258,7 +258,7 @@ begin
     if exists (select usename from pg_stat_activity where usename = username) then
         raise notice 'User has active connections';
     else
-    	foreach role_ in array roles
+		for role_ in select a.rolname from pg_roles a where pg_has_role(username, a.oid, 'member') and a.rolname not in (username, 'teleport')
 	    loop
         	execute format('revoke %I from %I', role_, username);
 	    end loop;
@@ -349,7 +349,7 @@ func (e *Engine) deprovisionUser(ctx context.Context, sessionCtx *common.Session
 		return common.ConvertConnectError(err, sessionCtx)
 	}
 	defer conn.Close(ctx)
-	_, err = conn.Exec(ctx, `call teleport_delete_user($1, $2)`, databaseUser, []string{"testrole"})
+	_, err = conn.Exec(ctx, `call teleport_delete_user($1)`, databaseUser)
 	if err != nil {
 		return trace.Wrap(err)
 	}
