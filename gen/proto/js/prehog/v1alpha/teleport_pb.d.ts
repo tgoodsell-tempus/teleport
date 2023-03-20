@@ -1579,6 +1579,157 @@ export namespace HelloTeleportResponse {
     }
 }
 
+export class UserActivityReport extends jspb.Message { 
+    getReportId(): Uint8Array | string;
+    getReportId_asU8(): Uint8Array;
+    getReportId_asB64(): string;
+    setReportId(value: Uint8Array | string): UserActivityReport;
+
+    getClusterName(): Uint8Array | string;
+    getClusterName_asU8(): Uint8Array;
+    getClusterName_asB64(): string;
+    setClusterName(value: Uint8Array | string): UserActivityReport;
+
+    getReporterId(): Uint8Array | string;
+    getReporterId_asU8(): Uint8Array;
+    getReporterId_asB64(): string;
+    setReporterId(value: Uint8Array | string): UserActivityReport;
+
+
+    hasStartTime(): boolean;
+    clearStartTime(): void;
+    getStartTime(): google_protobuf_timestamp_pb.Timestamp | undefined;
+    setStartTime(value?: google_protobuf_timestamp_pb.Timestamp): UserActivityReport;
+
+    clearRecordsList(): void;
+    getRecordsList(): Array<UserActivityRecord>;
+    setRecordsList(value: Array<UserActivityRecord>): UserActivityReport;
+    addRecords(value?: UserActivityRecord, index?: number): UserActivityRecord;
+
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): UserActivityReport.AsObject;
+    static toObject(includeInstance: boolean, msg: UserActivityReport): UserActivityReport.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: UserActivityReport, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): UserActivityReport;
+    static deserializeBinaryFromReader(message: UserActivityReport, reader: jspb.BinaryReader): UserActivityReport;
+}
+
+export namespace UserActivityReport {
+    export type AsObject = {
+        reportId: Uint8Array | string,
+        clusterName: Uint8Array | string,
+        reporterId: Uint8Array | string,
+        startTime?: google_protobuf_timestamp_pb.Timestamp.AsObject,
+        recordsList: Array<UserActivityRecord.AsObject>,
+    }
+}
+
+export class UserActivityRecord extends jspb.Message { 
+    getUserName(): Uint8Array | string;
+    getUserName_asU8(): Uint8Array;
+    getUserName_asB64(): string;
+    setUserName(value: Uint8Array | string): UserActivityRecord;
+
+    getLogins(): number;
+    setLogins(value: number): UserActivityRecord;
+
+    getSshSessions(): number;
+    setSshSessions(value: number): UserActivityRecord;
+
+    getAppSessions(): number;
+    setAppSessions(value: number): UserActivityRecord;
+
+    getKubeSessions(): number;
+    setKubeSessions(value: number): UserActivityRecord;
+
+    getDbSessions(): number;
+    setDbSessions(value: number): UserActivityRecord;
+
+    getDesktopSessions(): number;
+    setDesktopSessions(value: number): UserActivityRecord;
+
+    getAppTcpSessions(): number;
+    setAppTcpSessions(value: number): UserActivityRecord;
+
+    getSshPortSessions(): number;
+    setSshPortSessions(value: number): UserActivityRecord;
+
+    getKubeRequests(): number;
+    setKubeRequests(value: number): UserActivityRecord;
+
+    getSftpEvents(): number;
+    setSftpEvents(value: number): UserActivityRecord;
+
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): UserActivityRecord.AsObject;
+    static toObject(includeInstance: boolean, msg: UserActivityRecord): UserActivityRecord.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: UserActivityRecord, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): UserActivityRecord;
+    static deserializeBinaryFromReader(message: UserActivityRecord, reader: jspb.BinaryReader): UserActivityRecord;
+}
+
+export namespace UserActivityRecord {
+    export type AsObject = {
+        userName: Uint8Array | string,
+        logins: number,
+        sshSessions: number,
+        appSessions: number,
+        kubeSessions: number,
+        dbSessions: number,
+        desktopSessions: number,
+        appTcpSessions: number,
+        sshPortSessions: number,
+        kubeRequests: number,
+        sftpEvents: number,
+    }
+}
+
+export class SubmitUsageReportsRequest extends jspb.Message { 
+    clearUserActivityList(): void;
+    getUserActivityList(): Array<UserActivityReport>;
+    setUserActivityList(value: Array<UserActivityReport>): SubmitUsageReportsRequest;
+    addUserActivity(value?: UserActivityReport, index?: number): UserActivityReport;
+
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): SubmitUsageReportsRequest.AsObject;
+    static toObject(includeInstance: boolean, msg: SubmitUsageReportsRequest): SubmitUsageReportsRequest.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: SubmitUsageReportsRequest, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): SubmitUsageReportsRequest;
+    static deserializeBinaryFromReader(message: SubmitUsageReportsRequest, reader: jspb.BinaryReader): SubmitUsageReportsRequest;
+}
+
+export namespace SubmitUsageReportsRequest {
+    export type AsObject = {
+        userActivityList: Array<UserActivityReport.AsObject>,
+    }
+}
+
+export class SubmitUsageReportsResponse extends jspb.Message { 
+
+    serializeBinary(): Uint8Array;
+    toObject(includeInstance?: boolean): SubmitUsageReportsResponse.AsObject;
+    static toObject(includeInstance: boolean, msg: SubmitUsageReportsResponse): SubmitUsageReportsResponse.AsObject;
+    static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+    static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+    static serializeBinaryToWriter(message: SubmitUsageReportsResponse, writer: jspb.BinaryWriter): void;
+    static deserializeBinary(bytes: Uint8Array): SubmitUsageReportsResponse;
+    static deserializeBinaryFromReader(message: SubmitUsageReportsResponse, reader: jspb.BinaryReader): SubmitUsageReportsResponse;
+}
+
+export namespace SubmitUsageReportsResponse {
+    export type AsObject = {
+    }
+}
+
 export enum ResourceKind {
     RESOURCE_KIND_UNSPECIFIED = 0,
     RESOURCE_KIND_NODE = 1,
