@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import { formatRelative } from 'date-fns';
 
 import Table, { Cell, ClickableLabelCell } from 'design/DataTable';
@@ -24,46 +24,14 @@ import { Trash } from 'design/Icon';
 import api from 'teleport/services/api';
 import cfg from 'teleport/config';
 import useStickyClusterId from 'teleport/useStickyClusterId';
-
 import {
   FeatureBox,
   FeatureHeader,
   FeatureHeaderTitle,
 } from 'teleport/components/Layout';
-
 import { NavLink } from 'teleport/components/Router';
 
-import type { CreateLockData, Lock, LockForTable } from './types';
-
-export function useLocks(clusterId: string) {
-  const [locks, setLocks] = useState<LockForTable[]>([]);
-
-  const fetchLocks = useCallback((clusterId: string) => {
-    api.get(cfg.getLocksUrl(clusterId)).then((resp: Lock[]) => {
-      const locksResp = resp.map(lock => ({
-        ...lock,
-        targets: Object.entries(lock.targets).map(([key, value]) => ({
-          name: key,
-          value,
-        })),
-      }));
-      setLocks(locksResp);
-    });
-  }, []);
-
-  const createLock = useCallback(
-    async (clusterId: string, createLockData: CreateLockData) => {
-      await api.put(cfg.getLocksUrl(clusterId), createLockData);
-    },
-    []
-  );
-
-  useEffect(() => {
-    fetchLocks(clusterId);
-  }, [clusterId, fetchLocks]);
-
-  return { createLock, fetchLocks, locks };
-}
+import { useLocks } from './useLocks';
 
 function getFormattedDate(d: string): string {
   try {

@@ -14,22 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import SlidePanel from 'design/SlidePanel';
 
 import { ArrowBack, Trash } from 'design/Icon';
-import { Box, ButtonPrimary, Flex, Input, Text } from 'design';
+import { Alert, Box, ButtonPrimary, Flex, Input, Text } from 'design';
 import { Cell } from 'design/DataTable';
 
 import useStickyClusterId from 'teleport/useStickyClusterId';
 import history from 'teleport/services/history';
 import cfg from 'teleport/config';
 
-import { useLocks } from './Locks';
+import { useLocks } from './useLocks';
 import { StyledTable } from './shared';
 
 import type { Positions } from 'design/SlidePanel/SlidePanel';
 import type { CreateLockData, SelectedLockTarget } from './types';
+import type { ApiError } from 'teleport/services/api/parseError';
 
 type Props = {
   panelPosition: Positions;
@@ -46,11 +47,13 @@ export function CreateLock({
 }: Props) {
   const { clusterId } = useStickyClusterId();
   const { createLock } = useLocks(clusterId);
+  const [error, setError] = useState('');
 
   const messageRef = useRef<HTMLInputElement>(null);
   const ttlRef = useRef<HTMLInputElement>(null);
 
   function handleCreateLock() {
+    setError('');
     selectedLockTargets.forEach(async lockTarget => {
       const lockData: CreateLockData = {
         targets: { [lockTarget.type]: lockTarget.name },
@@ -59,13 +62,18 @@ export function CreateLock({
       const ttl = ttlRef?.current?.value;
       if (message) lockData.message = message;
       if (ttl) lockData.ttl = ttl;
-      await createLock(clusterId, lockData);
+      await createLock(clusterId, lockData)
+        .then(() => {
+          setTimeout(() => {
+            // It takes longer for the cache to be updated when adding locks so
+            // this waits 1s before redirecting to fetch the list again.
+            history.push(cfg.getLocksRoute(clusterId));
+          }, 1000);
+        })
+        .catch((e: ApiError) => {
+          setError(e.message);
+        });
     });
-    setTimeout(() => {
-      // It takes longer for the cache to be updated when adding locks so
-      // this waits 1s before redirecting to fetch the list again.
-      history.push(cfg.getLocksRoute(clusterId));
-    }, 1000);
   }
 
   function onRemove(name) {
@@ -80,6 +88,7 @@ export function CreateLock({
       closePanel={() => setPanelPosition('closed')}
     >
       <div>
+        {error && <Alert kind="danger" children={error} />}
         <Flex alignItems="center">
           <ArrowBack
             fontSize={25}
