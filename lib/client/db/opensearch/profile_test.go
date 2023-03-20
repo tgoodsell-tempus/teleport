@@ -44,7 +44,7 @@ func TestConfigTLS(t *testing.T) {
 			{
 				Name:     "teleport",
 				Endpoint: "https://host.example.com:8080/",
-				Certificate: Certificate{
+				Certificate: &Certificate{
 					CACert: "/foo/bar/ca.cert",
 					Cert:   "/priv/clt.cert",
 					Key:    "/priv/clt.key",
@@ -63,14 +63,10 @@ func TestWriteTempConfig(t *testing.T) {
 	tmp := t.TempDir()
 	fn, err := WriteTempConfig(tmp, ConfigNoTLS("host.example.com", 8080))
 	require.NoError(t, err)
-	require.Equal(t, path.Join(tmp, "opensearch-cli", "f6ed6849.yml"), fn)
+	require.Equal(t, path.Join(tmp, "opensearch-cli", "150502df.yml"), fn)
 	bytes, err := os.ReadFile(fn)
 	require.Equal(t, `profiles:
-- certificate:
-    cafilepath: ""
-    clientcertificatefilepath: ""
-    clientkeyfilepath: ""
-  endpoint: http://host.example.com:8080/
+- endpoint: http://host.example.com:8080/
   max_retry: 3
   name: teleport
   timeout: 10
