@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatRelative } from 'date-fns';
 
 import Table, { Cell, ClickableLabelCell } from 'design/DataTable';
 import { ButtonPrimary } from 'design/Button';
@@ -65,6 +66,14 @@ export function useLocks(clusterId: string) {
   return { createLock, fetchLocks, locks };
 }
 
+function getFormattedDate(d: string): string {
+  try {
+    return formatRelative(new Date(d), Date.now());
+  } catch (e) {
+    return '';
+  }
+}
+
 export function Locks() {
   const { clusterId } = useStickyClusterId();
   const { locks, fetchLocks } = useLocks(clusterId);
@@ -110,13 +119,15 @@ export function Locks() {
             key: 'createdAt',
             headerText: 'Start Date',
             isSortable: true,
-            render: ({ createdAt }) => <Cell>{createdAt}</Cell>,
+            render: ({ createdAt }) => (
+              <Cell>{getFormattedDate(createdAt)}</Cell>
+            ),
           },
           {
             key: 'expires',
             headerText: 'Expiration',
             isSortable: true,
-            render: ({ expires }) => <Cell>{expires}</Cell>,
+            render: ({ expires }) => <Cell>{getFormattedDate(expires)}</Cell>,
           },
           {
             key: 'message',
