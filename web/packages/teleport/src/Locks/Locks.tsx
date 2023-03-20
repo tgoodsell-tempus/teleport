@@ -126,7 +126,9 @@ export function Locks() {
             key: 'expires',
             headerText: 'Expiration',
             isSortable: true,
-            render: ({ expires }) => <Cell>{getFormattedDate(expires)}</Cell>,
+            render: ({ expires }) => (
+              <Cell>{getFormattedDate(expires) || 'Never'}</Cell>
+            ),
           },
           {
             key: 'message',
