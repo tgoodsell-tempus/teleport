@@ -69,6 +69,10 @@ func CheckEngines(names ...string) error {
 	enginesMu.RLock()
 	defer enginesMu.RUnlock()
 	for _, name := range names {
+		if err := EnterpriseDBProtocolValidation(name); err != nil {
+			// Don't assert Enterprise protocol is a build is OSS
+			continue
+		}
 		if engines[name] == nil {
 			return trace.NotFound("database engine %q is not registered", name)
 		}
