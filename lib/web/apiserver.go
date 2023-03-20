@@ -2439,7 +2439,7 @@ func (h *Handler) createClusterLock(
 		}
 	}
 
-	var ttl *time.Time = nil
+	var ttl *time.Time
 	if ttlDuration != 0 {
 		t := time.Now().UTC().Add(ttlDuration)
 		ttl = &t

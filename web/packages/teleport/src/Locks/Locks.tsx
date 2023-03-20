@@ -19,7 +19,6 @@ import { formatRelative } from 'date-fns';
 
 import Table, { Cell, ClickableLabelCell } from 'design/DataTable';
 import { ButtonPrimary } from 'design/Button';
-import { MenuButton, MenuItem } from 'shared/components/MenuAction';
 import { Trash } from 'design/Icon';
 
 import api from 'teleport/services/api';
@@ -164,13 +163,3 @@ export function Locks() {
     </FeatureBox>
   );
 }
-
-const ManageCell = ({ onDelete }: { onDelete: () => void }) => {
-  return (
-    <Cell align="right">
-      <MenuButton>
-        <MenuItem onClick={() => onDelete()}>Delete...</MenuItem>
-      </MenuButton>
-    </Cell>
-  );
-};
