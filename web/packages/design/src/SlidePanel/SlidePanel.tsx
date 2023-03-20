@@ -24,19 +24,25 @@ import { Box } from 'design';
 export type Positions = 'open' | 'closed';
 
 type SlidePanelProps = {
-  closePanel: () => void;
+  closePanel?: () => void;
   position: Positions;
 };
 
 type Props = PropsWithChildren<SlidePanelProps>;
 
-export function SlidePanel({ position, closePanel, children }: Props) {
+export function SlidePanel({
+  position,
+  closePanel = () => {},
+  children,
+}: Props) {
   useEscape(() => closePanel());
 
   return (
     <>
-      <Mask className={position} onClick={closePanel} />
-      <Panel className={position}>{children}</Panel>
+      <Mask className={position} onClick={closePanel} data-testid="mask" />
+      <Panel className={position} data-testid="panel">
+        {children}
+      </Panel>
     </>
   );
 }
