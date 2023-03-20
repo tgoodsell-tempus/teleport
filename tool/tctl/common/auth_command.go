@@ -369,42 +369,6 @@ func (a *AuthCommand) generateSnowflakeKey(ctx context.Context, clusterAPI auth.
 	)
 }
 
-func (a *AuthCommand) generateOracleConfig(ctx context.Context, clusterAPI auth.ClientI) error {
-	key, err := client.GenerateRSAKey()
-	if err != nil {
-		return trace.Wrap(err)
-	}
-
-	cn, err := clusterAPI.GetClusterName()
-	if err != nil {
-		return trace.Wrap(err)
-	}
-	certAuthID := types.CertAuthID{
-		Type:       types.DatabaseCA,
-		DomainName: cn.GetClusterName(),
-	}
-	databaseCA, err := clusterAPI.GetCertAuthority(ctx, certAuthID, false)
-	if err != nil {
-		return trace.Wrap(err)
-	}
-
-	key.TrustedCerts = []auth.TrustedCerts{{TLSCertificates: services.GetTLSCerts(databaseCA)}}
-
-	filesWritten, err := identityfile.Write(ctx, identityfile.WriteConfig{
-		OutputPath:           a.output,
-		Key:                  key,
-		Format:               a.outputFormat,
-		OverwriteDestination: a.signOverwrite,
-	})
-	if err != nil {
-		return trace.Wrap(err)
-	}
-
-	return trace.Wrap(
-		writeHelperMessageDBmTLS(os.Stdout, filesWritten, "", a.outputFormat, ""),
-	)
-}
-
 // RotateCertAuthority starts or restarts certificate authority rotation process
 func (a *AuthCommand) RotateCertAuthority(ctx context.Context, client auth.ClientI) error {
 	if a.rotateType == "" {

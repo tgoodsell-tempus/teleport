@@ -14,7 +14,6 @@ limitations under the License.
 package client
 
 import (
-	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -477,7 +476,7 @@ func (p *ProfileStatus) DatabaseLocalCAPath() string {
 	if path, ok := p.virtualPathFromEnv(VirtualPathDatabase, nil); ok {
 		return path
 	}
-	return filepath.Join(keypaths.DatabaseDir(p.Dir, p.Name, p.Username), fmt.Sprintf("proxy-localca.pem"))
+	return filepath.Join(keypaths.DatabaseDir(p.Dir, p.Name, p.Username), "proxy-localca.pem")
 }
 
 // AppCertPath returns path to the specified app access certificate

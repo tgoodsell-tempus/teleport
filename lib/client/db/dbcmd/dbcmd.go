@@ -644,7 +644,7 @@ func (c *CLICommandBuilder) getOracleCommand() (*exec.Cmd, error) {
 	}
 	args := []string{
 		"-L", // dont retry
-		fmt.Sprintf(`%s`, cs.ConnString()),
+		cs.ConnString(),
 	}
 	return c.options.exe.Command(oracleBin, args...), nil
 }
