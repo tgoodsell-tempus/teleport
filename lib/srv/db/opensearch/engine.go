@@ -199,6 +199,7 @@ func (e *Engine) process(ctx context.Context, req *http.Request) error {
 	if err != nil {
 		return trace.Wrap(err)
 	}
+	defer resp.Body.Close()
 
 	return trace.Wrap(e.sendResponse(resp))
 }

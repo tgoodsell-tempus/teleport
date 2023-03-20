@@ -65,6 +65,7 @@ func TestWriteTempConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, path.Join(tmp, "opensearch-cli", "150502df.yml"), fn)
 	bytes, err := os.ReadFile(fn)
+	require.NoError(t, err)
 	require.Equal(t, `profiles:
 - endpoint: http://host.example.com:8080/
   max_retry: 3
