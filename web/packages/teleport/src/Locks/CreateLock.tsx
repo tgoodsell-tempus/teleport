@@ -88,7 +88,7 @@ export function CreateLock({
       closePanel={() => setPanelPosition('closed')}
     >
       <div>
-        {error && <Alert kind="danger" children={error} />}
+        {error && <Alert kind="danger" children={error} data-testid="alert" />}
         <Flex alignItems="center">
           <ArrowBack
             fontSize={25}
@@ -136,6 +136,7 @@ export function CreateLock({
                         background-color: #414b70;
                       }
                     `}
+                    data-testid="trash-btn"
                   />
                 </Cell>
               ),
@@ -145,11 +146,15 @@ export function CreateLock({
         />
         <Box mt={3}>
           <Text mr={2}>Message: </Text>
-          <Input placeholder={`Going down for maintenance`} ref={messageRef} />
+          <Input
+            placeholder={`Going down for maintenance`}
+            ref={messageRef}
+            data-testid="description"
+          />
         </Box>
         <Box mt={3}>
           <Text mr={2}>TTL: </Text>
-          <Input placeholder={`5h`} ref={ttlRef} />
+          <Input placeholder={`5h`} ref={ttlRef} data-testid="ttl" />
         </Box>
       </div>
       <Flex mt={5} justifyContent="flex-end">
