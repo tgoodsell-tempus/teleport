@@ -121,6 +121,7 @@ export function Locks() {
                       background-color: #414b70;
                     }
                   `}
+                  data-testid="trash-btn"
                 />
               </Cell>
             ),
