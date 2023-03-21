@@ -51,8 +51,8 @@ type AggregatingUsageReporter struct {
 	backend    backend.Backend
 	client     prehogv1c.TeleportReportingServiceClient
 
-	clusterName []byte
-	reporterID  []byte
+	clusterName    []byte
+	reporterHostID []byte
 
 	mu        sync.Mutex
 	startTime time.Time
@@ -64,13 +64,13 @@ func NewAggregatingUsageReporter(
 	anonymizer utils.Anonymizer,
 	backend backend.Backend,
 	clusterName string,
-	reporterID string,
+	reporterHostID string,
 ) (*AggregatingUsageReporter, error) {
 	r := &AggregatingUsageReporter{
-		anonymizer:  anonymizer,
-		backend:     backend,
-		clusterName: anonymizer.AnonymizeNonEmpty(clusterName),
-		reporterID:  anonymizer.AnonymizeNonEmpty(reporterID),
+		anonymizer:     anonymizer,
+		backend:        backend,
+		clusterName:    anonymizer.AnonymizeNonEmpty(clusterName),
+		reporterHostID: anonymizer.AnonymizeNonEmpty(reporterHostID),
 	}
 
 	go r.runPeriodicSubmit(ctx)
@@ -198,7 +198,7 @@ func (r *AggregatingUsageReporter) persistReport(startTime time.Time, records ma
 	expiry := startTime.Add(userActivityTTL)
 
 	for len(pbRecords) > 0 {
-		reportID, wire, rem, err := prepareReport(r.clusterName, r.reporterID, pbStartTime, pbRecords)
+		reportID, wire, rem, err := prepareReport(r.clusterName, r.reporterHostID, pbStartTime, pbRecords)
 		if err != nil {
 			// TODO
 			return
@@ -217,17 +217,17 @@ func (r *AggregatingUsageReporter) persistReport(startTime time.Time, records ma
 }
 
 func prepareReport(
-	clusterName, reporterID []byte,
+	clusterName, reporterHostID []byte,
 	pbStartTime *timestamppb.Timestamp,
 	pbRecords []*prehogv1.UserActivityRecord,
 ) (uuid.UUID, []byte, []*prehogv1.UserActivityRecord, error) {
 	reportID := uuid.New()
 	report := &prehogv1.UserActivityReport{
-		ReportId:    reportID[:],
-		ClusterName: clusterName,
-		ReporterId:  reporterID,
-		StartTime:   pbStartTime,
-		Records:     pbRecords,
+		ReportUuid:     reportID[:],
+		ClusterName:    clusterName,
+		ReporterHostid: reporterHostID,
+		StartTime:      pbStartTime,
+		Records:        pbRecords,
 	}
 
 	wire, err := proto.Marshal(report)
