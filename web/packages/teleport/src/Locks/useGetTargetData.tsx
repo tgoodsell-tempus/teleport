@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 
 import useTeleport from 'teleport/useTeleport';
 
@@ -51,17 +51,17 @@ export const useGetTargetData: UseGetTargetData = (
 ) => {
   const [targetData, setTargetData] = useState<TableData[]>();
   const {
-    desktopService,
-    mfaService,
-    nodeService,
-    resourceService,
-    userService,
+    desktopService: { fetchDesktops },
+    mfaService: { fetchDevices },
+    nodeService: { fetchNodes },
+    resourceService: { fetchRoles },
+    userService: { fetchUsers },
   } = useTeleport();
 
-  useEffect(() => {
-    const targetDataFilters = {
+  const targetDataFilters = useMemo(() => {
+    return {
       user: {
-        fetch: userService.fetchUsers,
+        fetch: fetchUsers,
         handler: (setter, users) => {
           const filteredData = users.map(u => ({
             name: u.name,
@@ -71,7 +71,7 @@ export const useGetTargetData: UseGetTargetData = (
         },
       },
       role: {
-        fetch: resourceService.fetchRoles,
+        fetch: fetchRoles,
         handler: (setter, roles) => {
           const filteredData = roles.map(r => ({
             name: r.name,
@@ -80,7 +80,7 @@ export const useGetTargetData: UseGetTargetData = (
         },
       },
       node: {
-        fetch: nodeService.fetchNodes,
+        fetch: fetchNodes,
         handler: (setter, nodes) => {
           const filteredData = nodes.agents.map(n => ({
             name: n.hostname,
@@ -97,7 +97,7 @@ export const useGetTargetData: UseGetTargetData = (
         ],
       },
       mfa_device: {
-        fetch: mfaService.fetchDevices,
+        fetch: fetchDevices,
         handler: (setter, mfas) => {
           const filteredData = mfas.map(m => ({
             name: m.name,
@@ -109,7 +109,7 @@ export const useGetTargetData: UseGetTargetData = (
         },
       },
       windows_desktop: {
-        fetch: desktopService.fetchDesktops,
+        fetch: fetchDesktops,
         handler: (setter, desktops) => {
           const filteredData = desktops.agents.map(d => ({
             name: d.name,
@@ -121,10 +121,20 @@ export const useGetTargetData: UseGetTargetData = (
         options: [clusterId, { limit: 10 }],
       },
     };
+  }, [
+    clusterId,
+    fetchDesktops,
+    fetchDevices,
+    fetchNodes,
+    fetchRoles,
+    fetchUsers,
+  ]);
 
+  useEffect(() => {
     let action =
       targetDataFilters[targetType] || additionalTargets?.[targetType];
     if (!action) {
+      // eslint-disable-next-line no-console
       console.log(`unknown target type ${targetType}`);
       setTargetData([]);
       return;
@@ -133,16 +143,7 @@ export const useGetTargetData: UseGetTargetData = (
     action.fetch
       .apply(null, action.options)
       .then(action.handler.bind(null, setTargetData));
-  }, [
-    additionalTargets,
-    clusterId,
-    desktopService.fetchDesktops,
-    mfaService.fetchDevices,
-    nodeService.fetchNodes,
-    resourceService.fetchRoles,
-    targetType,
-    userService.fetchUsers,
-  ]);
+  }, [additionalTargets, targetDataFilters, targetType]);
 
   return targetData;
 };
