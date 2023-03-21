@@ -11084,9 +11084,9 @@ proto.prehog.v1alpha.UserActivityReport.prototype.toObject = function(opt_includ
  */
 proto.prehog.v1alpha.UserActivityReport.toObject = function(includeInstance, msg) {
   var f, obj = {
-    reportId: msg.getReportId_asB64(),
+    reportUuid: msg.getReportUuid_asB64(),
     clusterName: msg.getClusterName_asB64(),
-    reporterId: msg.getReporterId_asB64(),
+    reporterHostid: msg.getReporterHostid_asB64(),
     startTime: (f = msg.getStartTime()) && google_protobuf_timestamp_pb.Timestamp.toObject(includeInstance, f),
     recordsList: jspb.Message.toObjectList(msg.getRecordsList(),
     proto.prehog.v1alpha.UserActivityRecord.toObject, includeInstance)
@@ -11128,7 +11128,7 @@ proto.prehog.v1alpha.UserActivityReport.deserializeBinaryFromReader = function(m
     switch (field) {
     case 1:
       var value = /** @type {!Uint8Array} */ (reader.readBytes());
-      msg.setReportId(value);
+      msg.setReportUuid(value);
       break;
     case 2:
       var value = /** @type {!Uint8Array} */ (reader.readBytes());
@@ -11136,7 +11136,7 @@ proto.prehog.v1alpha.UserActivityReport.deserializeBinaryFromReader = function(m
       break;
     case 3:
       var value = /** @type {!Uint8Array} */ (reader.readBytes());
-      msg.setReporterId(value);
+      msg.setReporterHostid(value);
       break;
     case 4:
       var value = new google_protobuf_timestamp_pb.Timestamp;
@@ -11177,7 +11177,7 @@ proto.prehog.v1alpha.UserActivityReport.prototype.serializeBinary = function() {
  */
 proto.prehog.v1alpha.UserActivityReport.serializeBinaryToWriter = function(message, writer) {
   var f = undefined;
-  f = message.getReportId_asU8();
+  f = message.getReportUuid_asU8();
   if (f.length > 0) {
     writer.writeBytes(
       1,
@@ -11191,7 +11191,7 @@ proto.prehog.v1alpha.UserActivityReport.serializeBinaryToWriter = function(messa
       f
     );
   }
-  f = message.getReporterId_asU8();
+  f = message.getReporterHostid_asU8();
   if (f.length > 0) {
     writer.writeBytes(
       3,
@@ -11218,35 +11218,35 @@ proto.prehog.v1alpha.UserActivityReport.serializeBinaryToWriter = function(messa
 
 
 /**
- * optional bytes report_id = 1;
+ * optional bytes report_uuid = 1;
  * @return {!(string|Uint8Array)}
  */
-proto.prehog.v1alpha.UserActivityReport.prototype.getReportId = function() {
+proto.prehog.v1alpha.UserActivityReport.prototype.getReportUuid = function() {
   return /** @type {!(string|Uint8Array)} */ (jspb.Message.getFieldWithDefault(this, 1, ""));
 };
 
 
 /**
- * optional bytes report_id = 1;
- * This is a type-conversion wrapper around `getReportId()`
+ * optional bytes report_uuid = 1;
+ * This is a type-conversion wrapper around `getReportUuid()`
  * @return {string}
  */
-proto.prehog.v1alpha.UserActivityReport.prototype.getReportId_asB64 = function() {
+proto.prehog.v1alpha.UserActivityReport.prototype.getReportUuid_asB64 = function() {
   return /** @type {string} */ (jspb.Message.bytesAsB64(
-      this.getReportId()));
+      this.getReportUuid()));
 };
 
 
 /**
- * optional bytes report_id = 1;
+ * optional bytes report_uuid = 1;
  * Note that Uint8Array is not supported on all browsers.
  * @see http://caniuse.com/Uint8Array
- * This is a type-conversion wrapper around `getReportId()`
+ * This is a type-conversion wrapper around `getReportUuid()`
  * @return {!Uint8Array}
  */
-proto.prehog.v1alpha.UserActivityReport.prototype.getReportId_asU8 = function() {
+proto.prehog.v1alpha.UserActivityReport.prototype.getReportUuid_asU8 = function() {
   return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
-      this.getReportId()));
+      this.getReportUuid()));
 };
 
 
@@ -11254,7 +11254,7 @@ proto.prehog.v1alpha.UserActivityReport.prototype.getReportId_asU8 = function() 
  * @param {!(string|Uint8Array)} value
  * @return {!proto.prehog.v1alpha.UserActivityReport} returns this
  */
-proto.prehog.v1alpha.UserActivityReport.prototype.setReportId = function(value) {
+proto.prehog.v1alpha.UserActivityReport.prototype.setReportUuid = function(value) {
   return jspb.Message.setProto3BytesField(this, 1, value);
 };
 
@@ -11302,35 +11302,35 @@ proto.prehog.v1alpha.UserActivityReport.prototype.setClusterName = function(valu
 
 
 /**
- * optional bytes reporter_id = 3;
+ * optional bytes reporter_hostid = 3;
  * @return {!(string|Uint8Array)}
  */
-proto.prehog.v1alpha.UserActivityReport.prototype.getReporterId = function() {
+proto.prehog.v1alpha.UserActivityReport.prototype.getReporterHostid = function() {
   return /** @type {!(string|Uint8Array)} */ (jspb.Message.getFieldWithDefault(this, 3, ""));
 };
 
 
 /**
- * optional bytes reporter_id = 3;
- * This is a type-conversion wrapper around `getReporterId()`
+ * optional bytes reporter_hostid = 3;
+ * This is a type-conversion wrapper around `getReporterHostid()`
  * @return {string}
  */
-proto.prehog.v1alpha.UserActivityReport.prototype.getReporterId_asB64 = function() {
+proto.prehog.v1alpha.UserActivityReport.prototype.getReporterHostid_asB64 = function() {
   return /** @type {string} */ (jspb.Message.bytesAsB64(
-      this.getReporterId()));
+      this.getReporterHostid()));
 };
 
 
 /**
- * optional bytes reporter_id = 3;
+ * optional bytes reporter_hostid = 3;
  * Note that Uint8Array is not supported on all browsers.
  * @see http://caniuse.com/Uint8Array
- * This is a type-conversion wrapper around `getReporterId()`
+ * This is a type-conversion wrapper around `getReporterHostid()`
  * @return {!Uint8Array}
  */
-proto.prehog.v1alpha.UserActivityReport.prototype.getReporterId_asU8 = function() {
+proto.prehog.v1alpha.UserActivityReport.prototype.getReporterHostid_asU8 = function() {
   return /** @type {!Uint8Array} */ (jspb.Message.bytesAsU8(
-      this.getReporterId()));
+      this.getReporterHostid()));
 };
 
 
@@ -11338,7 +11338,7 @@ proto.prehog.v1alpha.UserActivityReport.prototype.getReporterId_asU8 = function(
  * @param {!(string|Uint8Array)} value
  * @return {!proto.prehog.v1alpha.UserActivityReport} returns this
  */
-proto.prehog.v1alpha.UserActivityReport.prototype.setReporterId = function(value) {
+proto.prehog.v1alpha.UserActivityReport.prototype.setReporterHostid = function(value) {
   return jspb.Message.setProto3BytesField(this, 3, value);
 };
 

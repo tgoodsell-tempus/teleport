@@ -421,11 +421,11 @@ message HelloTeleportResponse {}
 
 message UserActivityReport {
   // randomly generated UUID for this specific report, 16 bytes (in string order)
-  bytes report_id = 1;
+  bytes report_uuid = 1;
   // anonymized, 32 bytes (HMAC-SHA-256)
   bytes cluster_name = 2;
   // anonymized, 32 bytes (HMAC-SHA-256)
-  bytes reporter_id = 3;
+  bytes reporter_hostid = 3;
   // beginning of the time window for this data; ending is not specified but is
   // intended to be at most 15 minutes
   google.protobuf.Timestamp start_time = 4;

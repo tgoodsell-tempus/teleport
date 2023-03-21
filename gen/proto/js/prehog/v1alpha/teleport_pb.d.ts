@@ -1580,20 +1580,20 @@ export namespace HelloTeleportResponse {
 }
 
 export class UserActivityReport extends jspb.Message { 
-    getReportId(): Uint8Array | string;
-    getReportId_asU8(): Uint8Array;
-    getReportId_asB64(): string;
-    setReportId(value: Uint8Array | string): UserActivityReport;
+    getReportUuid(): Uint8Array | string;
+    getReportUuid_asU8(): Uint8Array;
+    getReportUuid_asB64(): string;
+    setReportUuid(value: Uint8Array | string): UserActivityReport;
 
     getClusterName(): Uint8Array | string;
     getClusterName_asU8(): Uint8Array;
     getClusterName_asB64(): string;
     setClusterName(value: Uint8Array | string): UserActivityReport;
 
-    getReporterId(): Uint8Array | string;
-    getReporterId_asU8(): Uint8Array;
-    getReporterId_asB64(): string;
-    setReporterId(value: Uint8Array | string): UserActivityReport;
+    getReporterHostid(): Uint8Array | string;
+    getReporterHostid_asU8(): Uint8Array;
+    getReporterHostid_asB64(): string;
+    setReporterHostid(value: Uint8Array | string): UserActivityReport;
 
 
     hasStartTime(): boolean;
@@ -1619,9 +1619,9 @@ export class UserActivityReport extends jspb.Message {
 
 export namespace UserActivityReport {
     export type AsObject = {
-        reportId: Uint8Array | string,
+        reportUuid: Uint8Array | string,
         clusterName: Uint8Array | string,
-        reporterId: Uint8Array | string,
+        reporterHostid: Uint8Array | string,
         startTime?: google_protobuf_timestamp_pb.Timestamp.AsObject,
         recordsList: Array<UserActivityRecord.AsObject>,
     }
