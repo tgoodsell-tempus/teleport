@@ -50,6 +50,10 @@ export const SearchBarList = React.forwardRef<HTMLElement, Props>(
     }, [activeItem]);
 
     function handleClick(e: React.SyntheticEvent) {
+      if (attempt.status !== 'success' || attempt.data.length === 0) {
+        return;
+      }
+
       const el = e.target;
       if (el instanceof Element) {
         const itemEl = el.closest('[data-attr]');
