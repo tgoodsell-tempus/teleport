@@ -48,7 +48,9 @@ export function useSearch() {
       const searchPromises = connectedClusters.map(cluster =>
         resourcesService.searchResources(cluster.uri, search)
       );
-      return { results: (await Promise.all(searchPromises)).flat(), search };
+      const results = (await Promise.all(searchPromises)).flat().slice(0, 10);
+
+      return { results, search };
     },
     [clustersService, resourcesService]
   );
