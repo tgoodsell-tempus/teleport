@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect } from 'react';
 import { Highlight } from 'shared/components/Highlight';
-import { useAsync } from 'shared/hooks/useAsync';
+import { mapAttempt, useAsync } from 'shared/hooks/useAsync';
 
 import { useSearchContext } from '../SearchContext';
 import { ParametrizedAction } from '../actions';
@@ -14,21 +14,23 @@ interface ParameterPickerProps {
 
 export function ParameterPicker(props: ParameterPickerProps) {
   const { inputValue, close, changeActivePicker } = useSearchContext();
-  const [attempt, fetch] = useAsync(props.action.parameter.getSuggestions);
-  let filtered: string[] = [];
+  const [suggestionsAttempt, fetch] = useAsync(
+    props.action.parameter.getSuggestions
+  );
 
   useEffect(() => {
     fetch();
   }, [props.action]);
 
-  if (attempt.status === 'success') {
-    filtered = attempt.data.filter(v =>
+  const attempt = mapAttempt(suggestionsAttempt, suggestions =>
+    suggestions.filter(v =>
       v.toLocaleLowerCase().includes(inputValue.toLocaleLowerCase())
-    );
-  }
+    )
+  );
 
+  let extraItems: string[] = [];
   if (inputValue) {
-    filtered.unshift(inputValue);
+    extraItems = [inputValue];
   }
 
   const onPick = useCallback(
@@ -39,12 +41,16 @@ export function ParameterPicker(props: ParameterPickerProps) {
     [close, props.action]
   );
 
+  const onBack = useCallback(() => {
+    changeActivePicker(actionPicker);
+  }, [changeActivePicker]);
+
   return (
     <ResultList<string>
-      loading={attempt.status === 'processing'}
-      items={filtered}
+      attempt={attempt}
+      extraItems={extraItems}
       onPick={onPick}
-      onBack={() => changeActivePicker(actionPicker)}
+      onBack={onBack}
       render={item => (
         <Highlight text={item} keywords={[inputValue]}></Highlight>
       )}

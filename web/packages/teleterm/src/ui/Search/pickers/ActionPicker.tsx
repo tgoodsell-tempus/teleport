@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { Box, Flex, Label as DesignLabel, Text } from 'design';
 import * as icons from 'design/Icon';
 
-import { makeEmptyAttempt, useAsync } from 'shared/hooks/useAsync';
+import { makeEmptyAttempt, useAsync, mapAttempt } from 'shared/hooks/useAsync';
 import { Highlight } from 'shared/components/Highlight';
 
 import { useAppContext } from 'teleterm/ui/appContextProvider';
@@ -27,17 +27,17 @@ import { ResultList } from './ResultList';
 
 export function ActionPicker() {
   const ctx = useAppContext();
-  const [attempt, fetch, setAttempt] = useAsync(useSearch());
+  const [searchAttempt, fetch, setAttempt] = useAsync(useSearch());
   const { inputValue, changeActivePicker, close } = useSearchContext();
   const debouncedInputValue = useDebounce(inputValue, 200);
 
-  const actions = useMemo(() => {
-    if (attempt.status === 'success') {
-      const { results, search } = attempt.data;
-      return mapToActions(ctx, sortResults(results || [], search));
-    }
-    return [];
-  }, [attempt.data, attempt.status, ctx]);
+  const attempt = useMemo(
+    () =>
+      mapAttempt(searchAttempt, ({ results, search }) => {
+        return mapToActions(ctx, sortResults(results || [], search));
+      }),
+    [ctx, searchAttempt]
+  );
 
   useEffect(() => {
     if (debouncedInputValue) {
@@ -66,8 +66,7 @@ export function ActionPicker() {
 
   return (
     <ResultList<SearchAction>
-      loading={attempt.status === 'processing'}
-      items={actions}
+      attempt={attempt}
       onPick={onPick}
       onBack={close}
       render={item => {

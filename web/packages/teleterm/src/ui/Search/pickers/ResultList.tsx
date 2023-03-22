@@ -14,26 +14,46 @@
  * limitations under the License.
  */
 
-import React, { ReactElement, useEffect, useRef, useState } from 'react';
+import React, {
+  ReactElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import styled from 'styled-components';
+
+import { Attempt } from 'shared/hooks/useAsync';
 
 import LinearProgress from 'teleterm/ui/components/LinearProgress';
 
 type ResultListProps<T> = {
-  loading: boolean;
-  items: T[];
+  attempt: Attempt<T[]>;
+  /**
+   * extraItems is an array of extra results that get render irrelevant of the attempt status.
+   */
+  extraItems?: T[];
   onPick(item: T): void;
   onBack(): void;
   render(item: T): ReactElement;
 };
 
 export function ResultList<T>(props: ResultListProps<T>) {
+  const { attempt, extraItems = [], onPick, onBack } = props;
   const activeItemRef = useRef<HTMLDivElement>();
   const [activeItemIndex, setActiveItemIndex] = useState(0);
 
+  const items = useMemo(
+    () =>
+      attempt.status === 'success'
+        ? [...extraItems, ...attempt.data]
+        : extraItems,
+    [attempt.status, attempt.data, extraItems]
+  );
+
   useEffect(() => {
     const handleArrowKey = (e: KeyboardEvent, nudge: number) => {
-      const next = getNext(activeItemIndex + nudge, props.items.length);
+      const next = getNext(activeItemIndex + nudge, items.length);
       setActiveItemIndex(next);
       // `false` - bottom of the element will be aligned to the bottom of the visible area of the scrollable ancestor
       activeItemRef.current?.scrollIntoView(false);
@@ -44,24 +64,27 @@ export function ResultList<T>(props: ResultListProps<T>) {
         case 'Enter': {
           e.stopPropagation();
           e.preventDefault();
-          const item = props.items[activeItemIndex];
+
+          const item = items[activeItemIndex];
           if (item) {
-            props.onPick(item);
+            onPick(item);
           }
           break;
         }
         case 'Escape': {
-          props.onBack();
+          onBack();
           break;
         }
         case 'ArrowUp':
           e.stopPropagation();
           e.preventDefault();
+
           handleArrowKey(e, -1);
           break;
         case 'ArrowDown':
           e.stopPropagation();
           e.preventDefault();
+
           handleArrowKey(e, 1);
           break;
       }
@@ -69,27 +92,11 @@ export function ResultList<T>(props: ResultListProps<T>) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [props.onPick, activeItemIndex, props.items]);
-
-  const $items = props.items.map((r, index) => {
-    const isActive = index === activeItemIndex;
-
-    return (
-      <StyledItem
-        ref={isActive ? activeItemRef : null}
-        $active={isActive}
-        // TODO: Provide a real key instead of using index.
-        key={`${index}`}
-        onClick={() => props.onPick(r)}
-      >
-        {props.render(r)}
-      </StyledItem>
-    );
-  });
+  }, [items, attempt.status, onPick, onBack, activeItemIndex]);
 
   return (
     <>
-      {props.loading && (
+      {attempt.status === 'processing' && (
         <div
           style={{
             position: 'absolute',
@@ -102,7 +109,21 @@ export function ResultList<T>(props: ResultListProps<T>) {
           <LinearProgress transparentBackground={true} />
         </div>
       )}
-      {$items}
+      {items.map((r, index) => {
+        const isActive = index === activeItemIndex;
+
+        return (
+          <StyledItem
+            ref={isActive ? activeItemRef : null}
+            $active={isActive}
+            // TODO: Provide a real key instead of using index.
+            key={`${index}`}
+            onClick={() => props.onPick(r)}
+          >
+            {props.render(r)}
+          </StyledItem>
+        );
+      })}
     </>
   );
 }
