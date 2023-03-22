@@ -134,9 +134,13 @@ const StyledItem = styled.div(({ theme, $active }) => {
       cursor: 'pointer',
       background: theme.colors.primary.lighter,
     },
+    '& mark': {
+      color: 'inherit',
+      backgroundColor: theme.colors.secondary.light,
+    },
 
     borderBottom: `2px solid ${theme.colors.primary.main}`,
-    padding: '2px 8px',
+    padding: `${theme.space[1]}px ${theme.space[2]}px`,
     color: theme.colors.primary.contrastText,
     background: $active
       ? theme.colors.primary.lighter

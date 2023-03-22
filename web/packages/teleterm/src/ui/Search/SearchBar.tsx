@@ -112,18 +112,21 @@ const Input = styled.input(props => {
   const { theme } = props;
   return {
     height: '32px',
-    background: theme.colors.primary.lighter,
+    background: theme.colors.primary.dark,
     boxSizing: 'border-box',
     color: theme.colors.text.primary,
     width: '100%',
-    border: 'none',
+    border: `0.5px ${theme.colors.action.disabledBackground} solid`,
     outline: 'none',
     padding: '2px 8px',
     '&:hover, &:focus': {
       color: theme.colors.primary.contrastText,
-      background: theme.colors.primary.lighter,
+      background: theme.colors.primary.light,
 
       opacity: 1,
+    },
+    '::placeholder': {
+      color: theme.colors.text.secondary,
     },
 
     ...space(props),

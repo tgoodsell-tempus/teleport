@@ -18,6 +18,7 @@ import {
 } from 'teleterm/ui/Search/searchResult';
 import * as tsh from 'teleterm/services/tshd/types';
 import { sortResults, useSearch } from 'teleterm/ui/Search/useSearch';
+import * as uri from 'teleterm/ui/uri';
 
 import { mapToActions, SearchAction } from '../actions';
 import { useSearchContext } from '../SearchContext';
@@ -27,6 +28,8 @@ import { ResultList } from './ResultList';
 
 export function ActionPicker() {
   const ctx = useAppContext();
+  const { clustersService } = ctx;
+
   const [searchAttempt, fetch, setAttempt] = useAsync(useSearch());
   const { inputValue, changeActivePicker, close } = useSearchContext();
   const debouncedInputValue = useDebounce(inputValue, 200);
@@ -37,6 +40,16 @@ export function ActionPicker() {
         return mapToActions(ctx, sortResults(results || [], search));
       }),
     [ctx, searchAttempt]
+  );
+
+  const getClusterName = useCallback(
+    (resourceUri: uri.ResourceUri) => {
+      const clusterUri = uri.routing.ensureClusterUri(resourceUri);
+      const cluster = clustersService.findCluster(clusterUri);
+
+      return cluster ? cluster.name : uri.routing.parseClusterName(resourceUri);
+    },
+    [clustersService]
   );
 
   useEffect(() => {
@@ -71,7 +84,12 @@ export function ActionPicker() {
       onBack={close}
       render={item => {
         const Component = ComponentMap[item.searchResult.kind];
-        return <Component item={item.searchResult} />;
+        return (
+          <Component
+            searchResult={item.searchResult}
+            getClusterName={getClusterName}
+          />
+        );
       }}
     />
   );
@@ -96,89 +114,156 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const ComponentMap: Record<
   SearchResult['kind'],
-  React.FC<{ item: SearchResult }>
+  React.FC<SearchResultItem<SearchResult>>
 > = {
   server: ServerItem,
   kube: KubeItem,
   database: DatabaseItem,
 };
 
-function ServerItem(props: { item: SearchResultServer }) {
+type SearchResultItem<T> = {
+  searchResult: T;
+  getClusterName: (uri: uri.ResourceUri) => string;
+};
+
+function ServerItem(props: SearchResultItem<SearchResultServer>) {
+  const { searchResult } = props;
+  const server = searchResult.resource;
+
   return (
-    <Flex alignItems="flex-start" p={1} minWidth="300px">
-      <SquareIconBackground color="#4DB2F0">
-        <icons.Server fontSize="20px" />
-      </SquareIconBackground>
-      <Flex flexDirection="column" ml={1} flex={1}>
-        <Flex justifyContent="space-between" alignItems="center">
-          <Box mr={2}>
-            <HighlightField field="hostname" searchResult={props.item} />
-          </Box>
-          <Box>
-            <Text typography="body2" fontSize={0}>
-              {props.item.score}
-            </Text>
-          </Box>
+    <Flex flexDirection="column" minWidth="300px" gap={1}>
+      <Flex justifyContent="space-between" alignItems="center">
+        <Flex alignItems="center" gap={1} flex="1 0">
+          <SquareIconBackground color="#c05b9e">
+            <icons.Server />
+          </SquareIconBackground>
+          <Text typography="body1">
+            Connect over SSH to{' '}
+            <strong>
+              <HighlightField field="hostname" searchResult={searchResult} />
+            </strong>
+          </Text>
         </Flex>
-        <Labels item={props.item} />
-      </Flex>
-    </Flex>
-  );
-}
-
-function DatabaseItem(props: { item: SearchResultDatabase }) {
-  const db = props.item.resource;
-
-  return (
-    <Flex alignItems="flex-start" p={1} minWidth="300px">
-      <SquareIconBackground color="#4DB2F0">
-        <icons.Database fontSize="20px" />
-      </SquareIconBackground>
-      <Flex flexDirection="column" ml={1} flex={1}>
-        <Flex justifyContent="space-between" alignItems="center">
-          <Box mr={2}>
-            <HighlightField field="name" searchResult={props.item} />
-          </Box>
-          <Box>
-            <Text typography="body2" fontSize={0}>
-              {db.type}/{db.protocol} {props.item.score}
-            </Text>
-          </Box>
-        </Flex>
-        <Labels item={props.item} />
-      </Flex>
-    </Flex>
-  );
-}
-
-function KubeItem(props: { item: SearchResultKube }) {
-  return (
-    <Flex alignItems="flex-start" p={1} minWidth="300px">
-      <SquareIconBackground color="#4DB2F0">
-        <icons.Kubernetes fontSize="20px" />
-      </SquareIconBackground>
-      <Flex flexDirection="column" ml={1} flex={1}>
-        <Box mr={2}>
-          <HighlightField field="name" searchResult={props.item} />
+        <Box>
+          <Text typography="body2" fontSize={0}>
+            {props.getClusterName(server.uri)}
+          </Text>
         </Box>
-        <Labels item={props.item} />
       </Flex>
+
+      <Labels searchResult={searchResult}>
+        <DesignLabel key={'addr'} kind="secondary">
+          {server.tunnel ? (
+            <span title="This node is connected to the cluster through a reverse tunnel">
+              ↵ tunnel
+            </span>
+          ) : (
+            <HighlightField field="addr" searchResult={searchResult} />
+          )}
+        </DesignLabel>
+      </Labels>
     </Flex>
   );
 }
 
-function Labels(props: { item: SearchResult }) {
+function DatabaseItem(props: SearchResultItem<SearchResultDatabase>) {
+  const { searchResult } = props;
+  const db = searchResult.resource;
+
+  return (
+    <Flex flexDirection="column" minWidth="300px" gap={1}>
+      <Flex justifyContent="space-between" alignItems="center">
+        <Flex alignItems="center" gap={1} flex="1 0">
+          <SquareIconBackground
+            color="#4ab9c9"
+            // The database icon is different than ssh and kube icons for some reason.
+            css={`
+              padding-left: 5px;
+              padding-top: 5px;
+            `}
+          >
+            <icons.Database />
+          </SquareIconBackground>
+          <Text typography="body1">
+            Set up a db connection for{' '}
+            <strong>
+              <HighlightField field="name" searchResult={searchResult} />
+            </strong>
+          </Text>
+        </Flex>
+        <Box>
+          <Text typography="body2" fontSize={0}>
+            {props.getClusterName(db.uri)}
+          </Text>
+        </Box>
+      </Flex>
+
+      <Labels searchResult={searchResult}>
+        <DesignLabel key={'type-protocol'} kind="secondary">
+          <HighlightField field="type" searchResult={searchResult} />
+          /
+          <HighlightField field="protocol" searchResult={searchResult} />
+        </DesignLabel>
+        {db.desc && (
+          <DesignLabel key={'desc'} kind="secondary">
+            <HighlightField field="desc" searchResult={searchResult} />
+          </DesignLabel>
+        )}
+      </Labels>
+    </Flex>
+  );
+}
+
+function KubeItem(props: SearchResultItem<SearchResultKube>) {
+  const { searchResult } = props;
+
+  return (
+    <Flex flexDirection="column" minWidth="300px" gap={1}>
+      <Flex justifyContent="space-between" alignItems="center">
+        <Flex alignItems="center" gap={1} flex="1 0">
+          <SquareIconBackground color="#326ce5">
+            <icons.Kubernetes />
+          </SquareIconBackground>
+          <Text typography="body1">
+            Log in to Kubernetes cluster{' '}
+            <strong>
+              <HighlightField field="name" searchResult={searchResult} />
+            </strong>
+          </Text>
+        </Flex>
+        <Box>
+          <Text typography="body2" fontSize={0}>
+            {props.getClusterName(searchResult.resource.uri)}
+          </Text>
+        </Box>
+      </Flex>
+
+      <Labels searchResult={searchResult} />
+    </Flex>
+  );
+}
+
+function Labels(
+  props: React.PropsWithChildren<{ searchResult: SearchResult }>
+) {
+  const { searchResult } = props;
+
   return (
     <Flex gap={1} flexWrap="wrap">
-      {props.item.resource.labelsList.map(label => (
-        <Label key={label.name + label.value} item={props.item} label={label} />
+      {props.children}
+      {searchResult.resource.labelsList.map(label => (
+        <Label
+          key={label.name + label.value}
+          searchResult={searchResult}
+          label={label}
+        />
       ))}
     </Flex>
   );
 }
 
-function Label(props: { item: SearchResult; label: tsh.Label }) {
-  const { item, label } = props;
+function Label(props: { searchResult: SearchResult; label: tsh.Label }) {
+  const { searchResult: item, label } = props;
   const labelMatches = item.labelMatches.filter(
     match => match.labelName == label.name
   );
@@ -219,12 +304,12 @@ function HighlightField(props: {
 
 const SquareIconBackground = styled(Box)`
   background: ${props => props.color};
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 26px;
-  width: 26px;
-  margin-right: 8px;
+  height: 24px;
+  width: 24px;
   border-radius: 2px;
   padding: 4px;
+  font-size: 18px;
 `;
