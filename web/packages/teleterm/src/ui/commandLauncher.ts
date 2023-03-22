@@ -25,7 +25,7 @@ const commands = {
   'tsh-ssh': {
     displayName: '',
     description: '',
-    run(
+    async run(
       ctx: IAppContext,
       args: { loginHost: string; localClusterUri: ClusterUri }
     ) {
@@ -38,6 +38,10 @@ const commands = {
         localClusterUri,
         loginHost
       );
+
+      // TODO(ravicious): Make sure it doesn't cause problems elsewhere in the app.
+      await ctx.workspacesService.setActiveWorkspace(rootClusterUri);
+
       documentsService.add(doc);
       documentsService.setLocation(doc.uri);
     },
@@ -90,15 +94,20 @@ const commands = {
   'kube-connect': {
     displayName: '',
     description: '',
-    run(ctx: IAppContext, args: { kubeUri: KubeUri }) {
+    async run(ctx: IAppContext, args: { kubeUri: KubeUri }) {
+      const rootClusterUri = routing.ensureRootClusterUri(args.kubeUri);
       const documentsService =
-        ctx.workspacesService.getActiveWorkspaceDocumentService();
+        ctx.workspacesService.getWorkspaceDocumentService(rootClusterUri);
       const kubeDoc = documentsService.createTshKubeDocument({
         kubeUri: args.kubeUri,
       });
       const connection = ctx.connectionTracker.findConnectionByDocument(
         kubeDoc
       ) as TrackedKubeConnection;
+
+      // TODO(ravicious): Make sure it doesn't cause problems elsewhere in the app.
+      await ctx.workspacesService.setActiveWorkspace(rootClusterUri);
+
       documentsService.add({
         ...kubeDoc,
         kubeConfigRelativePath:

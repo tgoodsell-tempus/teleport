@@ -128,7 +128,7 @@ export class DbUsernamePicker implements SearchBarPicker {
     return 'Select database username';
   }
 
-  onPick(actionDbUsername: ActionDbUsername) {
+  async onPick(actionDbUsername: ActionDbUsername) {
     const rootClusterUri = routing.ensureRootClusterUri(this.database.uri);
     const documentsService =
       this.workspacesService.getWorkspaceDocumentService(rootClusterUri);
@@ -143,6 +143,9 @@ export class DbUsernamePicker implements SearchBarPicker {
         actionDbUsername.searchResult.username
       ),
     });
+
+    // TODO(ravicious): Make sure it doesn't cause problems elsewhere in the app.
+    await this.workspacesService.setActiveWorkspace(rootClusterUri);
 
     const connectionToReuse =
       this.connectionTrackerService.findConnectionByDocument(doc);
