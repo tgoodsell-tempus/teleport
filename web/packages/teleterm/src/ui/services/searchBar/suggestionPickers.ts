@@ -28,6 +28,7 @@ import { searchResources } from 'teleterm/ui/Search/useSearch';
 import { routing } from 'teleterm/ui/uri';
 import { WorkspacesService } from 'teleterm/ui/services/workspacesService';
 import { ConnectionTrackerService } from 'teleterm/ui/services/connectionTracker';
+import Logger from 'teleterm/logger';
 
 import {
   ActionSshLogin,
@@ -156,11 +157,15 @@ export class DbUsernamePicker implements SearchBarPicker {
 }
 
 export class AllResultsPicker implements SearchBarPicker {
+  searchLogger: Logger;
+
   constructor(
     private resourceService: ResourcesService,
     private clustersService: ClustersService,
     private commandLauncher: CommandLauncher
-  ) {}
+  ) {
+    this.searchLogger = new Logger('search');
+  }
 
   async onFilter(value: string) {
     if (!value) {
@@ -171,6 +176,9 @@ export class AllResultsPicker implements SearchBarPicker {
       this.resourceService,
       value
     );
+    // TODO(ravicious): Remove before release.
+    this.searchLogger.info('results for', value, res);
+
     // mapping search results to actions, but I'm not sure about it
     // maye we can just have search results?
     return res.map(searchResult => {
