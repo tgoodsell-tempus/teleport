@@ -25,8 +25,6 @@ import {
   searchableFields,
 } from './searchResult';
 
-import type * as types from 'teleterm/services/tshd/types';
-
 /**
  * useSearch returns a function which searches for the given list of space-separated keywords across
  * all root and leaf clusters that the user is currently logged in to.
