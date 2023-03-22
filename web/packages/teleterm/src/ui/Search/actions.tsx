@@ -65,7 +65,7 @@ export function mapToActions(
             ctx.resourcesService.getDbUsers(result.resource.uri),
           placeholder: 'Provide db username',
         },
-        perform(dbUsername) {
+        async perform(dbUsername) {
           const rootClusterUri = routing.ensureRootClusterUri(
             result.resource.uri
           );
@@ -82,6 +82,8 @@ export function mapToActions(
               dbUsername
             ),
           });
+
+          await ctx.workspacesService.setActiveWorkspace(rootClusterUri);
 
           const connectionToReuse =
             ctx.connectionTracker.findConnectionByDocument(doc);
