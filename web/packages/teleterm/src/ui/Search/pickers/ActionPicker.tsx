@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import styled from 'styled-components';
 
 import { Box, Flex, Label as DesignLabel, Text } from 'design';
@@ -7,8 +13,8 @@ import * as icons from 'design/Icon';
 import { makeEmptyAttempt, useAsync, mapAttempt } from 'shared/hooks/useAsync';
 import { Highlight } from 'shared/components/Highlight';
 
+import Logger from 'teleterm/logger';
 import { useAppContext } from 'teleterm/ui/appContextProvider';
-
 import {
   ResourceMatch,
   SearchResult,
@@ -27,6 +33,7 @@ import { getParameterPicker } from './pickers';
 import { ResultList } from './ResultList';
 
 export function ActionPicker() {
+  const searchLogger = useRef(new Logger('search'));
   const ctx = useAppContext();
   const { clustersService } = ctx;
 
@@ -37,7 +44,10 @@ export function ActionPicker() {
   const attempt = useMemo(
     () =>
       mapAttempt(searchAttempt, ({ results, search }) => {
-        return mapToActions(ctx, sortResults(results || [], search));
+        const sortedResults = sortResults(results, search);
+        searchLogger.current.info('results for', search, sortedResults);
+
+        return mapToActions(ctx, sortedResults);
       }),
     [ctx, searchAttempt]
   );
