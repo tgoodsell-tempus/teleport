@@ -29,7 +29,6 @@ import {
   CreateAccessRequestParams,
   GetRequestableRolesParams,
   ReviewAccessRequestParams,
-  GetResourcesParams,
 } from 'teleterm/services/tshd/types';
 import { MainProcessClient } from 'teleterm/mainProcess/types';
 import { UsageService } from 'teleterm/ui/services/usage';
