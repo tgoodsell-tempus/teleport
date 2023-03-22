@@ -45,8 +45,9 @@ export async function searchResources(
   const searchPromises = connectedClusters.map(cluster =>
     resourcesService.searchResources(cluster.uri, search)
   );
+  const searchResults = (await Promise.all(searchPromises)).flat();
 
-  return sortResults((await Promise.all(searchPromises)).flat(), search);
+  return sortResults(searchResults, search).slice(0, 10);
 }
 
 export function sortResults(
