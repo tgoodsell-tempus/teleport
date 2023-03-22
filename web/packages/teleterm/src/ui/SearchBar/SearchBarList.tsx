@@ -28,6 +28,7 @@ import {
   SearchBarAction,
 } from 'teleterm/ui/services/searchBar/types';
 import { SearchResult, ResourceMatch } from 'teleterm/ui/Search/searchResult';
+import * as uri from 'teleterm/ui/uri';
 
 import type * as tsh from 'teleterm/services/tshd/types';
 import type { Attempt } from 'shared/hooks/useAsync';
@@ -133,9 +134,16 @@ const StyledItem = styled.div(({ theme, $active }) => {
       cursor: 'pointer',
       background: theme.colors.primary.lighter,
     },
+    '& mark': {
+      color: 'inherit',
+      backgroundColor: theme.colors.secondary.light,
+      // backgroundColor: 'inherit',
+      // filter: 'invert(100%)',
+      // 'mix-blend-mode': 'difference',
+    },
 
     borderBottom: `2px solid ${theme.colors.primary.main}`,
-    padding: '2px 8px',
+    padding: `${theme.space[1]}px ${theme.space[2]}px`,
     color: theme.colors.primary.contrastText,
     background: $active
       ? theme.colors.primary.lighter
@@ -175,28 +183,52 @@ const ComponentMap: Record<
   ['action.db-username']: DbUsernameItem,
 };
 
+// TODO(ravicious): Get cluster name from ClustersService.
+// TODO(ravicious): Show cluster name only if the user is logged in to more than 1 cluster.
+function clusterName(resourceUri: uri.ResourceUri): string {
+  return uri.routing.parseClusterName(resourceUri);
+}
+
 function ServerItem(props: { item: ActionSshConnect }) {
+  const server = props.item.searchResult.resource;
   return (
-    <Flex alignItems="flex-start" p={1} minWidth="300px">
-      <SquareIconBackground color="#4DB2F0">
-        <icons.Server fontSize="20px" />
-      </SquareIconBackground>
-      <Flex flexDirection="column" ml={1} flex={1}>
-        <Flex justifyContent="space-between" alignItems="center">
-          <Box mr={2}>
+    <Flex flexDirection="column" minWidth="300px" gap={1}>
+      <Flex justifyContent="space-between" alignItems="center">
+        <Flex alignItems="center" gap={1} flex="1 0">
+          <SquareIconBackground color="#c05b9e">
+            <icons.Server />
+          </SquareIconBackground>
+          <Text typography="body1">
+            Connect over SSH to{' '}
+            <strong>
+              <HighlightField
+                field="hostname"
+                searchResult={props.item.searchResult}
+              />
+            </strong>
+          </Text>
+        </Flex>
+        <Box>
+          <Text typography="body2" fontSize={0}>
+            {clusterName(props.item.searchResult.resource.uri)}
+          </Text>
+        </Box>
+      </Flex>
+
+      <Labels item={props.item.searchResult}>
+        <DesignLabel key={'addr'} kind="secondary">
+          {server.tunnel ? (
+            <span title="This node is connected to the cluster through a reverse tunnel">
+              ↵ tunnel
+            </span>
+          ) : (
             <HighlightField
-              field="hostname"
+              field="addr"
               searchResult={props.item.searchResult}
             />
-          </Box>
-          <Box>
-            <Text typography="body2" fontSize={0}>
-              {props.item.searchResult.score}
-            </Text>
-          </Box>
-        </Flex>
-        <Labels item={props.item.searchResult} />
-      </Flex>
+          )}
+        </DesignLabel>
+      </Labels>
     </Flex>
   );
 }
@@ -205,49 +237,92 @@ function DatabaseItem(props: { item: ActionDbConnect }) {
   const db = props.item.searchResult.resource;
 
   return (
-    <Flex alignItems="flex-start" p={1} minWidth="300px">
-      <SquareIconBackground color="#4DB2F0">
-        <icons.Database fontSize="20px" />
-      </SquareIconBackground>
-      <Flex flexDirection="column" ml={1} flex={1}>
-        <Flex justifyContent="space-between" alignItems="center">
-          <Box mr={2}>
+    <Flex flexDirection="column" minWidth="300px" gap={1}>
+      <Flex justifyContent="space-between" alignItems="center">
+        <Flex alignItems="center" gap={1} flex="1 0">
+          <SquareIconBackground
+            color="#4ab9c9"
+            // The database icon is different than ssh and kube icons for some reason.
+            css={`
+              padding-left: 5px;
+              padding-top: 5px;
+            `}
+          >
+            <icons.Database />
+          </SquareIconBackground>
+          <Text typography="body1">
+            Set up a db connection for{' '}
+            <strong>
+              <HighlightField
+                field="name"
+                searchResult={props.item.searchResult}
+              />
+            </strong>
+          </Text>
+        </Flex>
+        <Box>
+          <Text typography="body2" fontSize={0}>
+            {clusterName(db.uri)}
+          </Text>
+        </Box>
+      </Flex>
+
+      <Labels item={props.item.searchResult}>
+        <DesignLabel key={'type-protocol'} kind="secondary">
+          <HighlightField field="type" searchResult={props.item.searchResult} />
+          /
+          <HighlightField
+            field="protocol"
+            searchResult={props.item.searchResult}
+          />
+        </DesignLabel>
+        {db.desc && (
+          <DesignLabel key={'desc'} kind="secondary">
             <HighlightField
-              field="name"
+              field="desc"
               searchResult={props.item.searchResult}
             />
-          </Box>
-          <Box>
-            <Text typography="body2" fontSize={0}>
-              {db.type}/{db.protocol} {props.item.searchResult.score}
-            </Text>
-          </Box>
-        </Flex>
-        <Labels item={props.item.searchResult} />
-      </Flex>
+          </DesignLabel>
+        )}
+      </Labels>
     </Flex>
   );
 }
 
 function KubeItem(props: { item: ActionKubeConnect }) {
   return (
-    <Flex alignItems="flex-start" p={1} minWidth="300px">
-      <SquareIconBackground color="#4DB2F0">
-        <icons.Kubernetes fontSize="20px" />
-      </SquareIconBackground>
-      <Flex flexDirection="column" ml={1} flex={1}>
-        <Box mr={2}>
-          <HighlightField field="name" searchResult={props.item.searchResult} />
+    <Flex flexDirection="column" minWidth="300px" gap={1}>
+      <Flex justifyContent="space-between" alignItems="center">
+        <Flex alignItems="center" gap={1} flex="1 0">
+          <SquareIconBackground color="#326ce5">
+            <icons.Kubernetes />
+          </SquareIconBackground>
+          <Text typography="body1">
+            Log in to Kubernetes cluster{' '}
+            <strong>
+              <HighlightField
+                field="name"
+                searchResult={props.item.searchResult}
+              />
+            </strong>
+          </Text>
+        </Flex>
+        <Box>
+          <Text typography="body2" fontSize={0}>
+            {clusterName(props.item.searchResult.resource.uri)}
+          </Text>
         </Box>
-        <Labels item={props.item.searchResult} />
       </Flex>
+
+      <Labels item={props.item.searchResult} />
     </Flex>
   );
 }
 
-function Labels(props: { item: SearchResult }) {
+function Labels(props: React.PropsWithChildren<{ item: SearchResult }>) {
   return (
     <Flex gap={1} flexWrap="wrap">
+      {props.children}
       {props.item.resource.labelsList.map(label => (
         <Label key={label.name + label.value} item={props.item} label={label} />
       ))}
@@ -297,14 +372,14 @@ function HighlightField(props: {
 
 const SquareIconBackground = styled(Box)`
   background: ${props => props.color};
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 26px;
-  width: 26px;
-  margin-right: 8px;
+  height: 24px;
+  width: 24px;
   border-radius: 2px;
   padding: 4px;
+  font-size: 18px;
 `;
 
 const EmptyListText = styled(Box)`
