@@ -306,7 +306,7 @@ const generateCmd = (data: {
   isCloud: boolean;
   automaticUpgradesEnabled: boolean;
 }) => {
-  var extraYAMLConfig = '';
+  let extraYAMLConfig = '';
 
   if (data.isEnterprise) {
     extraYAMLConfig += 'enterprise: true\n';
