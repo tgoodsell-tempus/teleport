@@ -38,6 +38,7 @@ export function SearchBar() {
     placeholder,
     onBack,
     keyboardShortcut,
+    isPristine,
   } = useSearchBar();
   const refList = useRef<HTMLElement>();
   const refContainer = useRef<HTMLElement>();
@@ -134,7 +135,8 @@ export function SearchBar() {
       {visible && (
         <SearchBarList
           ref={refList}
-          items={attempt.data}
+          attempt={attempt}
+          isPristine={isPristine}
           activeItem={activeItemIndex}
           onPick={i => onPickItem(i)}
         />

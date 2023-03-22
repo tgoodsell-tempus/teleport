@@ -30,10 +30,18 @@ import {
 import { SearchResult, ResourceMatch } from 'teleterm/ui/Search/searchResult';
 
 import type * as tsh from 'teleterm/services/tshd/types';
+import type { Attempt } from 'shared/hooks/useAsync';
+
+type Props = {
+  attempt: Attempt<types.SearchBarAction[]>;
+  activeItem: number;
+  isPristine: boolean;
+  onPick(item: types.SearchBarAction): void;
+};
 
 export const SearchBarList = React.forwardRef<HTMLElement, Props>(
   (props, ref) => {
-    const { items, activeItem } = props;
+    const { attempt, activeItem, isPristine } = props;
     const activeItemRef = useRef<HTMLDivElement>();
 
     useEffect(() => {
@@ -41,28 +49,12 @@ export const SearchBarList = React.forwardRef<HTMLElement, Props>(
       activeItemRef.current?.scrollIntoView(false);
     }, [activeItem]);
 
-    const $items = items.map((r, index) => {
-      const Cmpt = ComponentMap[r.kind] || UnknownItem;
-      const isActive = index === activeItem;
-
-      return (
-        <StyledItem
-          data-attr={index}
-          ref={isActive ? activeItemRef : null}
-          $active={isActive}
-          key={`${index}`}
-        >
-          <Cmpt item={r} />
-        </StyledItem>
-      );
-    });
-
     function handleClick(e: React.SyntheticEvent) {
       const el = e.target;
       if (el instanceof Element) {
         const itemEl = el.closest('[data-attr]');
         const index = parseInt(itemEl.getAttribute('data-attr'));
-        props.onPick(items[index]);
+        props.onPick(attempt.data[index]);
       }
     }
 
@@ -73,7 +65,46 @@ export const SearchBarList = React.forwardRef<HTMLElement, Props>(
         data-attr="quickpicker.list"
         onClick={handleClick}
       >
-        {items.length === 0 ? 'Search for something' : $items}
+        {isPristine ? (
+          <EmptyListText>
+            <Text>
+              <ul>
+                <li>Separate the search terms with space.</li>
+                <li>
+                  Resources that match the query the most will appear at the
+                  top.
+                </li>
+                <li>
+                  Selecting a search result will connect to the resource in a
+                  new tab.
+                </li>
+              </ul>
+            </Text>
+          </EmptyListText>
+        ) : (
+          attempt.status === 'success' &&
+          (attempt.data.length === 0 ? (
+            <EmptyListText>
+              <Text>No matching items found.</Text>
+            </EmptyListText>
+          ) : (
+            attempt.data.map((r, index) => {
+              const Cmpt = ComponentMap[r.kind] || UnknownItem;
+              const isActive = index === activeItem;
+
+              return (
+                <StyledItem
+                  data-attr={index}
+                  ref={isActive ? activeItemRef : null}
+                  $active={isActive}
+                  key={`${index}`}
+                >
+                  <Cmpt item={r} />
+                </StyledItem>
+              );
+            })
+          ))
+        )}
       </StyledGlobalSearchResults>
     );
   }
@@ -128,12 +159,6 @@ const StyledGlobalSearchResults = styled.div(({ theme }) => {
     minHeight: '50px',
   };
 });
-
-type Props = {
-  items: types.SearchBarAction[];
-  activeItem: number;
-  onPick(item: types.SearchBarAction): void;
-};
 
 const ComponentMap: Record<
   SearchBarAction['kind'],
@@ -276,4 +301,16 @@ const SquareIconBackground = styled(Box)`
   margin-right: 8px;
   border-radius: 2px;
   padding: 4px;
+`;
+
+const EmptyListText = styled(Box)`
+  width: 100%;
+  height: 100%;
+  padding: ${props => props.theme.space[2]}px;
+  line-height: 1.5em;
+
+  ul {
+    margin: 0;
+    padding-inline-start: 2em;
+  }
 `;

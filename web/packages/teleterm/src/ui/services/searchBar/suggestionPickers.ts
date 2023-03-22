@@ -198,7 +198,7 @@ export class AllResultsPicker implements SearchBarPicker {
   }
 
   getPlaceholder() {
-    return 'Search for something';
+    return 'Search for resources by name and labels across clusters';
   }
 
   onPick(item: SearchBarAction) {

@@ -40,6 +40,8 @@ export function useSearchBar() {
     return items;
   });
   const { getAccelerator } = useKeyboardShortcutFormatters();
+  const isPristine =
+    inputRef.current?.value === '' && searchBarService.isUsingDefaultPicker();
 
   // const debouncedFetch = useMemo(() => debounce(fetch, 150), [picker]);
 
@@ -95,5 +97,6 @@ export function useSearchBar() {
     onHide: searchBarService.revertDefaultAndHide,
     onShow: searchBarService.show,
     keyboardShortcut: getAccelerator(OPEN_COMMAND_BAR_SHORTCUT_ACTION),
+    isPristine,
   };
 }

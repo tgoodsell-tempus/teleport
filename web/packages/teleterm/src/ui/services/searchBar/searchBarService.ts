@@ -109,6 +109,10 @@ export class SearchBarService extends Store<State> {
     });
   };
 
+  isUsingDefaultPicker = () => {
+    return this.state.picker === this.allResultsPicker;
+  };
+
   useState() {
     return useStore<SearchBarService>(this).state;
   }
