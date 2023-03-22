@@ -332,10 +332,9 @@ func TestFetchCloudEnvironment(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			c := &fetchConfig{
-				context: context.Background(),
-				httpDo:  tc.httpDo,
+				httpDo: tc.httpDo,
 			}
-			require.Equal(t, tc.expected, c.fetchCloudEnvironment())
+			require.Equal(t, tc.expected, c.fetchCloudEnvironment(context.Background()))
 		})
 	}
 }
