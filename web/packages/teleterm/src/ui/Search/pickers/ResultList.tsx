@@ -31,6 +31,7 @@ export function ResultList<T>(props: ResultListProps<T>) {
   const activeItemRef = useRef<HTMLDivElement>();
   const [activeItemIndex, setActiveItemIndex] = useState(0);
 
+  // TODO: Replace with calling scrollIntoView after setActiveItemIndex.
   useEffect(() => {
     // `false` - bottom of the element will be aligned to the bottom of the visible area of the scrollable ancestor
     activeItemRef.current?.scrollIntoView(false);
@@ -81,6 +82,7 @@ export function ResultList<T>(props: ResultListProps<T>) {
       <StyledItem
         ref={isActive ? activeItemRef : null}
         $active={isActive}
+        // TODO: Provide a real key instead of using index.
         key={`${index}`}
         onClick={() => props.onPick(r)}
       >

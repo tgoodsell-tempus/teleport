@@ -27,6 +27,7 @@ import { ResultList } from './ResultList';
 
 export function ActionPicker() {
   const ctx = useAppContext();
+  // TODO: Move sorting and scoring outside of search.
   const [attempt, fetch, setAttempt] = useAsync(useSearch());
   const { inputValue, changeActivePicker, close } = useSearchContext();
   const debouncedInputValue = useDebounce(inputValue, 200);

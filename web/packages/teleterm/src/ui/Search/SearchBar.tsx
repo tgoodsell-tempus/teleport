@@ -48,6 +48,8 @@ export function SearchBar() {
   const { activePicker, inputValue, onInputValueChange, opened, open, close } =
     useSearchContext();
 
+  // TODO: Define inputRef inside the context, then pass it to SearchBar and call focus in the
+  // `open` function.
   useEffect(() => {
     if (opened) {
       inputRef.current.focus();

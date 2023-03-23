@@ -40,6 +40,8 @@ export const SearchContextProvider: FC = props => {
   const [inputValue, setInputValue] = useState('');
   const [activePicker, setActivePicker] = useState(getActionPicker());
 
+  // TODO: Replace with clearing the input when setActivePicker is called, i.e. export a
+  // changeActivePicker function which calls setActivePicker and clears the input.
   useEffect(() => {
     setInputValue('');
   }, [activePicker]);

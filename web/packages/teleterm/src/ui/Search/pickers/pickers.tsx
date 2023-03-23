@@ -5,6 +5,7 @@ import { ParametrizedAction } from '../actions';
 import { ActionPicker } from './ActionPicker';
 import { ParameterPicker } from './ParameterPicker';
 
+// TODO: Refactor this to a const.
 export const getActionPicker = (): SearchPicker => {
   return {
     picker: <ActionPicker />,
