@@ -299,11 +299,11 @@ func (c *genericCollection[_, G, _]) getter(cacheOK bool) G {
 }
 
 // readCache is a replacement of (*Cache).read(). It has to become a package function because Go doesn't support
-// generic methods with new type variables. guardCollection[G] provides watchKind() for routing decisions and the getter
+// generic methods with new type variables. collectionGetter[G] provides watchKind() for routing decisions and the getter
 // type G for constructing a generic readGuard[G].
 // The value of cacheOK passed to collection.getter() will depend on both overall cache health and whether
 // the resource kind was rejected during the initialization.  
-func readCache[G any](cache *Cache, collection guardCollection[G]) (readGuard2[G], error) { ... }
+func readCache[G any](cache *Cache, collection collectionGetter[G]) (readGuard2[G], error) { ... }
 
 // readGuard now has only one generic field instead of listing all possible services.  
 type readGuard[G any] struct {
