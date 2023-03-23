@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
+import { useCallback } from 'react';
+
 import { assertUnreachable } from 'teleterm/ui/utils';
+import { useAppContext } from 'teleterm/ui/appContextProvider';
+import { SearchResult as ResourceSearchResult } from 'teleterm/ui/services/resources';
 
 import {
   LabelMatch,
@@ -24,9 +28,6 @@ import {
   mainResourceField,
   searchableFields,
 } from './searchResult';
-
-import { useAppContext } from 'teleterm/ui/appContextProvider';
-import { useCallback } from 'react';
 
 /**
  * useSearch returns a function which searches for the given list of space-separated keywords across
@@ -49,7 +50,6 @@ export function useSearch() {
       );
       const results = (await Promise.all(searchPromises)).flat();
 
-      // @ts-ignore
       return sortResults(results, search);
     },
     [clustersService, resourcesService]
@@ -57,7 +57,7 @@ export function useSearch() {
 }
 
 export function sortResults(
-  searchResults: SearchResult[],
+  searchResults: ResourceSearchResult[],
   search: string
 ): SearchResult[] {
   const terms = search
@@ -93,7 +93,7 @@ export function sortResults(
 }
 
 function populateMatches(
-  searchResult: SearchResult,
+  searchResult: ResourceSearchResult,
   terms: string[]
 ): SearchResult {
   const labelMatches: LabelMatch[] = [];
@@ -138,7 +138,7 @@ function populateMatches(
     });
   });
 
-  return { ...searchResult, labelMatches, resourceMatches };
+  return { ...searchResult, labelMatches, resourceMatches, score: 0 };
 }
 
 // TODO(ravicious): Extract the scoring logic to a function to better illustrate different weight
