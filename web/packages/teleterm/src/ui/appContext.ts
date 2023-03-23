@@ -37,7 +37,6 @@ import { ReloginService } from 'teleterm/services/relogin';
 import { TshdNotificationsService } from 'teleterm/services/tshdNotifications';
 import { UsageService } from 'teleterm/ui/services/usage';
 import { ResourcesService } from 'teleterm/ui/services/resources';
-import { SearchBarService } from 'teleterm/ui/services/searchBar';
 import { ConfigService } from 'teleterm/services/config';
 import { IAppContext } from 'teleterm/ui/types';
 
@@ -50,7 +49,6 @@ export default class AppContext implements IAppContext {
   terminalsService: TerminalsService;
   keyboardShortcutsService: KeyboardShortcutsService;
   quickInputService: QuickInputService;
-  searchBarService: SearchBarService;
   statePersistenceService: StatePersistenceService;
   workspacesService: WorkspacesService;
   mainProcessClient: MainProcessClient;
@@ -141,13 +139,6 @@ export default class AppContext implements IAppContext {
     this.tshdNotificationsService = new TshdNotificationsService(
       this.notificationsService,
       this.clustersService
-    );
-    this.searchBarService = new SearchBarService(
-      this.commandLauncher,
-      this.clustersService,
-      this.resourcesService,
-      this.workspacesService,
-      this.connectionTracker
     );
   }
 
