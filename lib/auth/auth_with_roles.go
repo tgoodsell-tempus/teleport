@@ -5800,6 +5800,60 @@ func (a *ServerWithRoles) CloneHTTPClient(params ...roundtrip.ClientParam) (*HTT
 	return nil, trace.NotImplemented("not implemented")
 }
 
+// ListIntegrations returns a paginated list of integration resources.
+func (a *ServerWithRoles) ListIntegrations(ctx context.Context, pageSize int, nextToken string) ([]types.Integration, string, error) {
+	if err := a.action(apidefaults.Namespace, types.KindIntegration, types.VerbList); err != nil {
+		return nil, "", trace.Wrap(err)
+	}
+
+	return a.authServer.ListIntegrations(ctx, pageSize, nextToken)
+}
+
+// GetIntegration returns the specified integration resources.
+func (a *ServerWithRoles) GetIntegration(ctx context.Context, name string) (types.Integration, error) {
+	if err := a.action(apidefaults.Namespace, types.KindIntegration, types.VerbRead); err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return a.authServer.GetIntegration(ctx, name)
+}
+
+// CreateIntegration creates a new integration resource.
+func (a *ServerWithRoles) CreateIntegration(ctx context.Context, ig types.Integration) error {
+	if err := a.action(apidefaults.Namespace, types.KindIntegration, types.VerbCreate); err != nil {
+		return trace.Wrap(err)
+	}
+
+	return a.authServer.CreateIntegration(ctx, ig)
+}
+
+// UpdateIntegration updates an existing integration resource.
+func (a *ServerWithRoles) UpdateIntegration(ctx context.Context, ig types.Integration) error {
+	if err := a.action(apidefaults.Namespace, types.KindIntegration, types.VerbUpdate); err != nil {
+		return trace.Wrap(err)
+	}
+
+	return a.authServer.UpdateIntegration(ctx, ig)
+}
+
+// DeleteIntegration removes the specified integration resource.
+func (a *ServerWithRoles) DeleteIntegration(ctx context.Context, name string) error {
+	if err := a.action(apidefaults.Namespace, types.KindIntegration, types.VerbDelete); err != nil {
+		return trace.Wrap(err)
+	}
+
+	return a.authServer.DeleteIntegration(ctx, name)
+}
+
+// DeleteAllIntegrations removes all integrations.
+func (a *ServerWithRoles) DeleteAllIntegrations(ctx context.Context) error {
+	if err := a.action(apidefaults.Namespace, types.KindIntegration, types.VerbDelete); err != nil {
+		return trace.Wrap(err)
+	}
+
+	return a.authServer.DeleteAllIntegrations(ctx)
+}
+
 // NewAdminAuthServer returns auth server authorized as admin,
 // used for auth server cached access
 func NewAdminAuthServer(authServer *Server, alog events.AuditLogSessionStreamer) (ClientI, error) {

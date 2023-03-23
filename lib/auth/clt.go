@@ -705,6 +705,7 @@ type ClientI interface {
 	services.WindowsDesktops
 	services.SAMLIdPServiceProviders
 	services.UserGroups
+	services.Integrations
 	WebService
 	services.Status
 	services.ClusterConfiguration

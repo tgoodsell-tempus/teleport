@@ -4897,6 +4897,88 @@ func (g *GRPCServer) GetBackend() backend.Backend {
 	return g.AuthServer.bk
 }
 
+// ListIntegrations returns a paginated list of Integration resources.
+func (g *GRPCServer) ListIntegrations(ctx context.Context, req *proto.ListIntegrationsRequest) (*proto.ListIntegrationsResponse, error) {
+	auth, err := g.authenticate(ctx)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	integrations, nextKey, err := auth.ListIntegrations(ctx, int(req.GetLimit()), req.GetNextKey())
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	integrationsV1 := make([]*types.IntegrationV1, len(integrations))
+	for i, ig := range integrations {
+		v1, ok := ig.(*types.IntegrationV1)
+		if !ok {
+			return nil, trace.BadParameter("unexpected integration type %T", ig)
+		}
+		integrationsV1[i] = v1
+	}
+
+	return &proto.ListIntegrationsResponse{
+		Integrations: integrationsV1,
+		NextKey:      nextKey,
+	}, nil
+}
+
+// GetIntegration returns the specified Integration resources.
+func (g *GRPCServer) GetIntegration(ctx context.Context, req *proto.GetIntegrationRequest) (*types.IntegrationV1, error) {
+	auth, err := g.authenticate(ctx)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	ig, err := auth.GetIntegration(ctx, req.GetName())
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	integrationV1, ok := ig.(*types.IntegrationV1)
+	if !ok {
+		return nil, trace.BadParameter("unexpected integration type %T", ig)
+	}
+
+	return integrationV1, nil
+}
+
+// CreateIntegration creates a new Integration resource.
+func (g *GRPCServer) CreateIntegration(ctx context.Context, ig *types.IntegrationV1) (*emptypb.Empty, error) {
+	auth, err := g.authenticate(ctx)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return &emptypb.Empty{}, trace.Wrap(auth.CreateIntegration(ctx, ig))
+}
+
+// UpdateIntegration updates an existing Integration resource.
+func (g *GRPCServer) UpdateIntegration(ctx context.Context, ig *types.IntegrationV1) (*emptypb.Empty, error) {
+	auth, err := g.authenticate(ctx)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return &emptypb.Empty{}, trace.Wrap(auth.UpdateIntegration(ctx, ig))
+}
+
+// DeleteIntegration removes the specified Integration resource.
+func (g *GRPCServer) DeleteIntegration(ctx context.Context, req *proto.DeleteIntegrationRequest) (*emptypb.Empty, error) {
+	auth, err := g.authenticate(ctx)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return &emptypb.Empty{}, trace.Wrap(auth.DeleteIntegration(ctx, req.GetName()))
+}
+
+// DeleteAllIntegrations removes all Integration resources.
+func (g *GRPCServer) DeleteAllIntegrations(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
+	auth, err := g.authenticate(ctx)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return &emptypb.Empty{}, trace.Wrap(auth.DeleteAllIntegrations(ctx))
+}
+
 // GRPCServerConfig specifies GRPC server configuration
 type GRPCServerConfig struct {
 	// APIConfig is GRPC server API configuration

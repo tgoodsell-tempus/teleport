@@ -3961,6 +3961,216 @@ func TestGetLicensePermissions(t *testing.T) {
 	}
 }
 
+func TestIntegrationCRUD(t *testing.T) {
+	ctx := context.Background()
+	srv := newTestTLSServer(t)
+
+	noError := func(err error) bool {
+		return err == nil
+	}
+
+	sampleIntegrationFn := func(t *testing.T, name string) types.Integration {
+		ig, err := types.NewIntegration(
+			types.Metadata{Name: name},
+			types.IntegrationSubKindAWSOIDC,
+			types.IntegrationSpecV1{
+				AWSRoleARN: "arn:aws:iam::123456789012:role/OpsTeam",
+			},
+		)
+		require.NoError(t, err)
+		return ig
+	}
+
+	tt := []struct {
+		Name         string
+		Role         types.RoleSpecV6
+		Setup        func(t *testing.T, igName string)
+		Test         func(client *Client, igName string) error
+		ErrAssertion func(error) bool
+	}{
+		// Read
+		{
+			Name: "allowed read access to integrations",
+			Role: types.RoleSpecV6{
+				Allow: types.RoleConditions{Rules: []types.Rule{{
+					Resources: []string{types.KindIntegration},
+					Verbs:     []string{types.VerbRead},
+				}}},
+			},
+			Setup: func(t *testing.T, igName string) {
+				err := srv.Auth().CreateIntegration(ctx, sampleIntegrationFn(t, igName))
+				require.NoError(t, err)
+			},
+			Test: func(client *Client, igName string) error {
+				_, err := client.GetIntegration(ctx, igName)
+				return err
+			},
+			ErrAssertion: noError,
+		},
+		{
+			Name: "no access to read integrations",
+			Role: types.RoleSpecV6{},
+			Test: func(client *Client, igName string) error {
+				_, err := client.GetIntegration(ctx, igName)
+				return err
+			},
+			ErrAssertion: trace.IsAccessDenied,
+		},
+		{
+			Name: "denied access to read integrations",
+			Role: types.RoleSpecV6{
+				Deny: types.RoleConditions{Rules: []types.Rule{{
+					Resources: []string{types.KindIntegration},
+					Verbs:     []string{types.VerbRead},
+				}}},
+			},
+			Test: func(client *Client, igName string) error {
+				_, err := client.GetIntegration(ctx, igName)
+				return err
+			},
+			ErrAssertion: trace.IsAccessDenied,
+		},
+
+		// List
+		{
+			Name: "allowed list access to integrations",
+			Role: types.RoleSpecV6{
+				Allow: types.RoleConditions{Rules: []types.Rule{{
+					Resources: []string{types.KindIntegration},
+					Verbs:     []string{types.VerbList},
+				}}},
+			},
+			Setup: func(t *testing.T, _ string) {
+				for i := 0; i < 10; i++ {
+					err := srv.Auth().CreateIntegration(ctx, sampleIntegrationFn(t, uuid.NewString()))
+					require.NoError(t, err)
+				}
+			},
+			Test: func(client *Client, igName string) error {
+				_, _, err := client.ListIntegrations(ctx, 0, "")
+				return err
+			},
+			ErrAssertion: noError,
+		},
+		{
+			Name: "no list access to integrations",
+			Role: types.RoleSpecV6{
+				Allow: types.RoleConditions{Rules: []types.Rule{{
+					Resources: []string{types.KindIntegration},
+					Verbs:     []string{types.VerbCreate},
+				}}},
+			},
+			Test: func(client *Client, igName string) error {
+				_, _, err := client.ListIntegrations(ctx, 0, "")
+				return err
+			},
+			ErrAssertion: trace.IsAccessDenied,
+		},
+
+		// Create
+		{
+			Name: "no access to create integrations",
+			Role: types.RoleSpecV6{},
+			Test: func(client *Client, igName string) error {
+				return client.CreateIntegration(ctx, sampleIntegrationFn(t, igName))
+			},
+			ErrAssertion: trace.IsAccessDenied,
+		},
+		{
+			Name: "access to create integrations",
+			Role: types.RoleSpecV6{
+				Allow: types.RoleConditions{Rules: []types.Rule{{
+					Resources: []string{types.KindIntegration},
+					Verbs:     []string{types.VerbCreate},
+				}}},
+			},
+			Test: func(client *Client, igName string) error {
+				return client.CreateIntegration(ctx, sampleIntegrationFn(t, igName))
+			},
+			ErrAssertion: noError,
+		},
+
+		// Update
+		{
+			Name: "no access to update integration",
+			Role: types.RoleSpecV6{},
+			Test: func(client *Client, igName string) error {
+				return client.UpdateIntegration(ctx, sampleIntegrationFn(t, igName))
+			},
+			ErrAssertion: trace.IsAccessDenied,
+		},
+		{
+			Name: "access to update integration",
+			Role: types.RoleSpecV6{
+				Allow: types.RoleConditions{Rules: []types.Rule{{
+					Resources: []string{types.KindIntegration},
+					Verbs:     []string{types.VerbUpdate},
+				}}},
+			},
+			Setup: func(t *testing.T, igName string) {
+				err := srv.Auth().CreateIntegration(ctx, sampleIntegrationFn(t, igName))
+				require.NoError(t, err)
+			},
+			Test: func(client *Client, igName string) error {
+				return client.UpdateIntegration(ctx, sampleIntegrationFn(t, igName))
+			},
+			ErrAssertion: noError,
+		},
+
+		// Delete
+		{
+			Name: "no access to delete integration",
+			Role: types.RoleSpecV6{},
+			Test: func(client *Client, igName string) error {
+				return client.DeleteIntegration(ctx, "x")
+			},
+			ErrAssertion: trace.IsAccessDenied,
+		},
+		{
+			Name: "access to delete integration",
+			Role: types.RoleSpecV6{
+				Allow: types.RoleConditions{Rules: []types.Rule{{
+					Resources: []string{types.KindIntegration},
+					Verbs:     []string{types.VerbDelete},
+				}}},
+			},
+			Setup: func(t *testing.T, igName string) {
+				err := srv.Auth().CreateIntegration(ctx, sampleIntegrationFn(t, igName))
+				require.NoError(t, err)
+			},
+			Test: func(client *Client, igName string) error {
+				return client.DeleteIntegration(ctx, igName)
+			},
+			ErrAssertion: noError,
+		},
+	}
+
+	for _, tc := range tt {
+		tc := tc
+		t.Run(tc.Name, func(t *testing.T) {
+			//t.Parallel()
+			roleName := "role-" + uuid.NewString()
+			role, err := CreateRole(ctx, srv.Auth(), roleName, tc.Role)
+			require.Nil(t, err)
+
+			userName := "user-" + uuid.NewString()
+			user, err := CreateUser(srv.Auth(), userName, role)
+			require.NoError(t, err)
+
+			client, err := srv.NewClient(TestUser(user.GetName()))
+			require.NoError(t, err)
+
+			igName := uuid.NewString()
+			if tc.Setup != nil {
+				tc.Setup(t, igName)
+			}
+
+			err = tc.Test(client, igName)
+			require.True(t, tc.ErrAssertion(err), err)
+		})
+	}
+}
+
 func TestCreateSAMLIdPServiceProvider(t *testing.T) {
 	ctx := context.Background()
 	srv := newTestTLSServer(t)

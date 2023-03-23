@@ -952,6 +952,34 @@ func (c *installerCollection) writeText(w io.Writer) error {
 	return nil
 }
 
+type integrationCollection struct {
+	integrations []types.Integration
+}
+
+func (c *integrationCollection) resources() (r []types.Resource) {
+	for _, ig := range c.integrations {
+		r = append(r, ig)
+	}
+	return r
+}
+func (c *integrationCollection) writeText(w io.Writer) error {
+	sort.Sort(types.Integrations(c.integrations))
+	var rows [][]string
+	for _, ig := range c.integrations {
+		properties := []string{}
+		if ig.GetAWSRoleARN() != "" {
+			properties = append(properties, fmt.Sprintf("AWSRoleARN=%s", ig.GetAWSRoleARN()))
+		}
+		rows = append(rows, []string{
+			ig.GetName(), ig.GetSubKind(), strings.Join(properties, ","),
+		})
+	}
+	headers := []string{"Name", "SubKind", "Properties"}
+	t := asciitable.MakeTable(headers, rows...)
+	_, err := t.AsBuffer().WriteTo(w)
+	return trace.Wrap(err)
+}
+
 type databaseServiceCollection struct {
 	databaseServices []types.DatabaseService
 }

@@ -84,6 +84,7 @@ func NewPresetEditorRole() types.Role {
 					types.NewRule(types.KindPlugin, RW()),
 					types.NewRule(types.KindOktaImportRule, RW()),
 					types.NewRule(types.KindOktaAssignment, RW()),
+					types.NewRule(types.KindIntegration, RW()),
 					// Please see defaultAllowRules when adding a new rule.
 				},
 			},
@@ -205,6 +206,7 @@ func defaultAllowRules() map[string][]types.Rule {
 			types.NewRule(types.KindOktaImportRule, RW()),
 			types.NewRule(types.KindOktaAssignment, RW()),
 			types.NewRule(types.KindDevice, append(RW(), types.VerbCreateEnrollToken, types.VerbEnroll)),
+			types.NewRule(types.KindIntegration, RW()),
 		},
 	}
 }

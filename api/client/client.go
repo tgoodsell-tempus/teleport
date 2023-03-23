@@ -3229,6 +3229,81 @@ func (c *Client) DeleteAllUserGroups(ctx context.Context) error {
 	return nil
 }
 
+// ListIntegrations returns a paginated list of Integration resources.
+func (c *Client) ListIntegrations(ctx context.Context, pageSize int, nextKey string) ([]types.Integration, string, error) {
+	resp, err := c.grpc.ListIntegrations(ctx, &proto.ListIntegrationsRequest{
+		Limit:   int32(pageSize),
+		NextKey: nextKey,
+	}, c.callOpts...)
+	if err != nil {
+		return nil, "", trail.FromGRPC(err)
+	}
+	integrations := make([]types.Integration, 0, len(resp.GetIntegrations()))
+	for _, ig := range resp.GetIntegrations() {
+		integrations = append(integrations, ig)
+	}
+	return integrations, resp.GetNextKey(), nil
+}
+
+// GetIntegration returns the specified Integration resources.
+func (c *Client) GetIntegration(ctx context.Context, name string) (types.Integration, error) {
+	ig, err := c.grpc.GetIntegration(ctx, &proto.GetIntegrationRequest{
+		Name: name,
+	}, c.callOpts...)
+	if err != nil {
+		return nil, trail.FromGRPC(err)
+	}
+	return ig, nil
+}
+
+// CreateIntegration creates a new Integration resource.
+func (c *Client) CreateIntegration(ctx context.Context, ig types.Integration) error {
+	igV1, ok := ig.(*types.IntegrationV1)
+	if !ok {
+		return trace.BadParameter("unsupported integration type %T", ig)
+	}
+
+	_, err := c.grpc.CreateIntegration(ctx, igV1, c.callOpts...)
+	if err != nil {
+		return trail.FromGRPC(err)
+	}
+	return nil
+}
+
+// UpdateIntegration updates an existing Integration resource.
+func (c *Client) UpdateIntegration(ctx context.Context, ig types.Integration) error {
+	igV1, ok := ig.(*types.IntegrationV1)
+	if !ok {
+		return trace.BadParameter("unsupported integration type %T", ig)
+	}
+
+	_, err := c.grpc.UpdateIntegration(ctx, igV1, c.callOpts...)
+	if err != nil {
+		return trail.FromGRPC(err)
+	}
+	return nil
+}
+
+// DeleteIntegration removes the specified Integration resource.
+func (c *Client) DeleteIntegration(ctx context.Context, name string) error {
+	_, err := c.grpc.DeleteIntegration(ctx, &proto.DeleteIntegrationRequest{
+		Name: name,
+	}, c.callOpts...)
+	if err != nil {
+		return trail.FromGRPC(err)
+	}
+	return nil
+}
+
+// DeleteAllIntegrations removes all Integrations.
+func (c *Client) DeleteAllIntegrations(ctx context.Context) error {
+	_, err := c.grpc.DeleteAllIntegrations(ctx, &emptypb.Empty{}, c.callOpts...)
+	if err != nil {
+		return trail.FromGRPC(err)
+	}
+	return nil
+}
+
 // PluginsClient returns an unadorned Plugins client, using the underlying
 // Auth gRPC connection.
 // Clients connecting to non-Enterprise clusters, or older Teleport versions,

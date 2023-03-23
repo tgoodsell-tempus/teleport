@@ -123,6 +123,7 @@ func (rc *ResourceCommand) Initialize(app *kingpin.Application, config *servicec
 		types.KindLoginRule:               rc.createLoginRule,
 		types.KindSAMLIdPServiceProvider:  rc.createSAMLIdPServiceProvider,
 		types.KindDevice:                  rc.createDevice,
+		types.KindIntegration:             rc.createIntegration,
 	}
 	rc.config = config
 
@@ -802,6 +803,41 @@ func (rc *ResourceCommand) createDevice(ctx context.Context, client auth.ClientI
 	}
 
 	fmt.Printf("Device %v/%v added to the inventory\n", dev.AssetTag, devicetrust.FriendlyOSType(dev.OsType))
+	return nil
+}
+
+func (rc *ResourceCommand) createIntegration(ctx context.Context, client auth.ClientI, raw services.UnknownResource) error {
+	integration, err := services.UnmarshalIntegration(raw.Raw)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	existingIntegration, err := client.GetIntegration(ctx, integration.GetName())
+	if err != nil && !trace.IsNotFound(err) {
+		return trace.Wrap(err)
+	}
+	exists := (err == nil)
+
+	if exists {
+		if !rc.force {
+			return trace.AlreadyExists("Integration %q already exists", integration.GetName())
+		}
+
+		// AWSRoleARN is the only updatable field
+		existingIntegration.SetAWSRoleARN(integration.GetAWSRoleARN())
+
+		if err := client.UpdateIntegration(ctx, existingIntegration); err != nil {
+			return trace.Wrap(err)
+		}
+		fmt.Printf("Integration %q has been updated\n", integration.GetName())
+
+	} else {
+		if err := client.CreateIntegration(ctx, integration); err != nil {
+			return trace.Wrap(err)
+		}
+		fmt.Printf("Integration %q has been created\n", integration.GetName())
+	}
+
 	return nil
 }
 
@@ -1718,6 +1754,31 @@ func (rc *ResourceCommand) getCollection(ctx context.Context, client auth.Client
 		})
 
 		return &deviceCollection{devices: devs}, nil
+	case types.KindIntegration:
+		if rc.ref.Name != "" {
+			ig, err := client.GetIntegration(ctx, rc.ref.Name)
+			if err != nil {
+				return nil, trace.Wrap(err)
+			}
+			return &integrationCollection{integrations: []types.Integration{ig}}, nil
+		}
+
+		var resources []types.Integration
+		nextKey := ""
+		for {
+			var sps []types.Integration
+			var err error
+			sps, nextKey, err = client.ListIntegrations(ctx, 0, nextKey)
+			if err != nil {
+				return nil, trace.Wrap(err)
+			}
+
+			resources = append(resources, sps...)
+			if nextKey == "" {
+				break
+			}
+		}
+		return &integrationCollection{integrations: resources}, nil
 	}
 	return nil, trace.BadParameter("getting %q is not supported", rc.ref.String())
 }
