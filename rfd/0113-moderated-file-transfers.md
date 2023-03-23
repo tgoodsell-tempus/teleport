@@ -99,11 +99,11 @@ export const MessageTypeEnum = {
 
 The reason we notify _all_ party members (originator excluded) is that a session might not necessarily require a moderator but just a second-party such as a peer. This would allow those types of sessions to still be audited and go through the file request approval process.
 
-After the steps above we are in the `PENDING` state. This is not a blocking state and essentially just creates the request, and updates the relevant UI (more on the UI below). 
+After the steps above we are in the `PENDING` state. This isn't a real "state" that exists in any struct, just the part of the flow that is waiting for responses. This is not a blocking state and essentially just creates the request, and updates the relevant UI (more on the UI below). 
 
 #### The Approval process
 
-Similar to sending the `FileTransferRequest` event, another event will be listened to, the `FileTranferRequestResponse` (working name). We could separate the event into two with Approve/Deny but a simple switch case on a field should suffice. 
+Similar to sending the `FileTransferRequest` event, another event will be listened to, the `FileTranferRequestResponse` (working name). We could separate this new event into two with Approve/Deny but a simple switch case on a field should suffice. 
 
 OnDeny:
 	1. Remove request from the session struct. No need to keep it around in a "Denied" state, just delete.
@@ -116,7 +116,7 @@ OnApprove:
 	2. Broadcast/audit event
 	3. We can then use a policy checker to see if the approvers fulfill any moderation policy on the original requester. We can treat this check the same as the `checkIfStart` conditional for opening a session. If this comes back true, we notify the original requester with an event containing the ID of the `FileTransferRequest`
 
-Once the client receives this final "approved" message, we can automatically send a "normal" SCP request (over HTTP) with two new optional params, `sessionID` and `requestID`. 
+Once the client receives this final "approved" message, we can automatically send a "normal" SCP request (over HTTP) with two new optional params, `sessionID` and `requestID` (similar to the new optional `webauthn` param in this same request). The benefits of using the normal SCP request is that we can conditionally choose to skip this entire approval process flow for non-moderated sessions. If the session is not moderated, just send the scp request as usual. If it is, do the song and dance perscribed above.
 
 #### Updated file transfer api handler
 
