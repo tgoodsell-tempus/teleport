@@ -1,14 +1,12 @@
 import React, { useCallback, useEffect } from 'react';
-
 import { Highlight } from 'shared/components/Highlight';
-
 import { useAsync } from 'shared/hooks/useAsync';
 
 import { useSearchContext } from '../SearchContext';
+import { ParametrizedAction } from '../actions';
 
 import { ResultList } from './ResultList';
 import { getActionPicker } from './pickers';
-import { ParametrizedAction } from 'teleterm/ui/Search/types';
 
 interface ParameterPickerProps {
   action: ParametrizedAction;
