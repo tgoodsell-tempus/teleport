@@ -6,7 +6,7 @@ import { useSearchContext } from '../SearchContext';
 import { ParametrizedAction } from '../actions';
 
 import { ResultList } from './ResultList';
-import { getActionPicker } from './pickers';
+import { actionPicker } from './pickers';
 
 interface ParameterPickerProps {
   action: ParametrizedAction;
@@ -44,7 +44,7 @@ export function ParameterPicker(props: ParameterPickerProps) {
       loading={attempt.status === 'processing'}
       items={filtered}
       onPick={onPick}
-      onBack={() => changeActivePicker(getActionPicker())}
+      onBack={() => changeActivePicker(actionPicker)}
       render={item => (
         <Highlight text={item} keywords={[inputValue]}></Highlight>
       )}

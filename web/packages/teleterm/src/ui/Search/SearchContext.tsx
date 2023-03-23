@@ -18,47 +18,53 @@ import React, {
   useContext,
   useState,
   FC,
-  useEffect,
   useCallback,
   createContext,
+  useRef,
+  MutableRefObject,
 } from 'react';
 
-import { getActionPicker } from './pickers/pickers';
+import { actionPicker, SearchPicker } from './pickers/pickers';
 
 const SearchContext = createContext<{
+  inputRef: MutableRefObject<HTMLInputElement>;
   inputValue: string;
-  onInputValueChange(val: string): void;
-  changeActivePicker(any): void;
-  activePicker: any;
+  onInputValueChange(value: string): void;
+  changeActivePicker(picker: SearchPicker): void;
+  activePicker: SearchPicker;
   close(): void;
   open(): void;
   opened: boolean;
 }>(null);
 
 export const SearchContextProvider: FC = props => {
+  const inputRef = useRef<HTMLInputElement>();
   const [opened, setOpened] = useState(false);
   const [inputValue, setInputValue] = useState('');
-  const [activePicker, setActivePicker] = useState(getActionPicker());
+  const [activePicker, setActivePicker] = useState(actionPicker);
 
-  useEffect(() => {
+  function changeActivePicker(picker: SearchPicker): void {
+    setActivePicker(picker);
     setInputValue('');
-  }, [activePicker]);
+  }
 
   const close = useCallback(() => {
     setOpened(false);
-    setActivePicker(getActionPicker());
+    setActivePicker(actionPicker);
   }, []);
 
   function open(): void {
     setOpened(true);
+    inputRef.current?.focus();
   }
 
   return (
     <SearchContext.Provider
       value={{
+        inputRef,
         inputValue,
         onInputValueChange: setInputValue,
-        changeActivePicker: setActivePicker,
+        changeActivePicker,
         activePicker,
         close,
         opened,

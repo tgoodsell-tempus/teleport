@@ -32,14 +32,11 @@ export function ResultList<T>(props: ResultListProps<T>) {
   const [activeItemIndex, setActiveItemIndex] = useState(0);
 
   useEffect(() => {
-    // `false` - bottom of the element will be aligned to the bottom of the visible area of the scrollable ancestor
-    activeItemRef.current?.scrollIntoView(false);
-  }, [activeItemIndex]);
-
-  useEffect(() => {
     const handleArrowKey = (e: KeyboardEvent, nudge: number) => {
       const next = getNext(activeItemIndex + nudge, props.items.length);
       setActiveItemIndex(next);
+      // `false` - bottom of the element will be aligned to the bottom of the visible area of the scrollable ancestor
+      activeItemRef.current?.scrollIntoView(false);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -81,6 +78,7 @@ export function ResultList<T>(props: ResultListProps<T>) {
       <StyledItem
         ref={isActive ? activeItemRef : null}
         $active={isActive}
+        // TODO: Provide a real key instead of using index.
         key={`${index}`}
         onClick={() => props.onPick(r)}
       >

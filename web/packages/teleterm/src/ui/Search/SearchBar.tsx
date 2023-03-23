@@ -43,16 +43,16 @@ export function SearchBarConnected() {
 export function SearchBar() {
   const listRef = useRef<HTMLElement>();
   const containerRef = useRef<HTMLElement>();
-  const inputRef = useRef<HTMLInputElement>();
   const { getAccelerator } = useKeyboardShortcutFormatters();
-  const { activePicker, inputValue, onInputValueChange, opened, open, close } =
-    useSearchContext();
-
-  useEffect(() => {
-    if (opened) {
-      inputRef.current.focus();
-    }
-  }, [inputRef, opened]);
+  const {
+    activePicker,
+    inputValue,
+    onInputValueChange,
+    inputRef,
+    opened,
+    open,
+    close,
+  } = useSearchContext();
 
   useKeyboardShortcuts({
     [OPEN_COMMAND_BAR_SHORTCUT_ACTION]: () => {

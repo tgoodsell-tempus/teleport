@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 
 import { Box, Flex, Label as DesignLabel, Text } from 'design';
@@ -17,7 +17,7 @@ import {
   SearchResultServer,
 } from 'teleterm/ui/Search/searchResult';
 import * as tsh from 'teleterm/services/tshd/types';
-import { useSearch } from 'teleterm/ui/Search/useSearch';
+import { sortResults, useSearch } from 'teleterm/ui/Search/useSearch';
 
 import { mapToActions, SearchAction } from '../actions';
 import { useSearchContext } from '../SearchContext';
@@ -30,6 +30,14 @@ export function ActionPicker() {
   const [attempt, fetch, setAttempt] = useAsync(useSearch());
   const { inputValue, changeActivePicker, close } = useSearchContext();
   const debouncedInputValue = useDebounce(inputValue, 200);
+
+  const actions = useMemo(() => {
+    if (attempt.status === 'success') {
+      const { results, search } = attempt.data;
+      return mapToActions(ctx, sortResults(results || [], search));
+    }
+    return [];
+  }, [attempt.data, attempt.status, ctx]);
 
   useEffect(() => {
     if (debouncedInputValue) {
@@ -59,7 +67,7 @@ export function ActionPicker() {
   return (
     <ResultList<SearchAction>
       loading={attempt.status === 'processing'}
-      items={mapToActions(ctx, attempt.data || [])}
+      items={actions}
       onPick={onPick}
       onBack={close}
       render={item => {
@@ -76,15 +84,11 @@ function useDebounce<T>(value: T, delay: number): T {
   useEffect(
     () => {
       // Update debounced value after delay
-      const handler = setTimeout(() => {
-        setDebouncedValue(value);
-      }, delay);
+      const handler = setTimeout(() => setDebouncedValue(value), delay);
       // Cancel the timeout if value changes (also on delay change or unmount)
       // This is how we prevent debounced value from updating if value is changed ...
       // .. within the delay period. Timeout gets cleared and restarted.
-      return () => {
-        clearTimeout(handler);
-      };
+      return () => clearTimeout(handler);
     },
     [value, delay] // Only re-call effect if value or delay changes
   );

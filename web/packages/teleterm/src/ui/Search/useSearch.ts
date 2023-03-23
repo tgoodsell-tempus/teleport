@@ -22,11 +22,11 @@ import { SearchResult as ResourceSearchResult } from 'teleterm/ui/services/resou
 
 import {
   LabelMatch,
-  ResourceMatch,
-  SearchResult,
-  mainResourceName,
   mainResourceField,
+  mainResourceName,
+  ResourceMatch,
   searchableFields,
+  SearchResult,
 } from './searchResult';
 
 /**
@@ -48,9 +48,7 @@ export function useSearch() {
       const searchPromises = connectedClusters.map(cluster =>
         resourcesService.searchResources(cluster.uri, search)
       );
-      const results = (await Promise.all(searchPromises)).flat();
-
-      return sortResults(results, search);
+      return { results: (await Promise.all(searchPromises)).flat(), search };
     },
     [clustersService, resourcesService]
   );
