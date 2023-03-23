@@ -313,7 +313,7 @@ type readGuard[G any] struct {
 }
 
 // cacheCollections is a type an instance of which will replace the c.collections map on Cache
-// setupCollections
+// This struct will be returned by setupCollections() instead of the map.
 type cacheCollections struct {
     // byKind is the former c.collections map
    byKind       map[resourceKind]collection
