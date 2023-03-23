@@ -77,27 +77,18 @@ export class ResourcesService {
       res.agentsList.map(resource => ({
         kind: 'server' as const,
         resource,
-        labelMatches: [],
-        resourceMatches: [],
-        score: 0,
       }))
     );
     const databases = this.fetchDatabases(params).then(res =>
       res.agentsList.map(resource => ({
         kind: 'database' as const,
         resource,
-        labelMatches: [],
-        resourceMatches: [],
-        score: 0,
       }))
     );
     const kubes = this.fetchKubes(params).then(res =>
       res.agentsList.map(resource => ({
         kind: 'kube' as const,
         resource,
-        labelMatches: [],
-        resourceMatches: [],
-        score: 0,
       }))
     );
 
