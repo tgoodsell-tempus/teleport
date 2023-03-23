@@ -303,7 +303,7 @@ func (c *genericCollection[_, G, _]) getter(cacheOK bool) G {
 // type G for constructing a generic readGuard[G].
 // The value of cacheOK passed to collection.getter() will depend on both overall cache health and whether
 // the resource kind was rejected during the initialization.  
-func readCache[G any](cache *Cache, collection collectionGetter[G]) (readGuard2[G], error) { ... }
+func readCache[G any](cache *Cache, collection collectionGetter[G]) (readGuard[G], error) { ... }
 
 // readGuard now has only one generic field instead of listing all possible services.  
 type readGuard[G any] struct {
