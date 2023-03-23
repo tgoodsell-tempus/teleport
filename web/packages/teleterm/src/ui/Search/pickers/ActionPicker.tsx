@@ -19,9 +19,8 @@ import {
 import * as tsh from 'teleterm/services/tshd/types';
 import { useSearch } from 'teleterm/ui/Search/useSearch';
 
-import { mapToActions } from '../actions';
+import { mapToActions, SearchAction } from '../actions';
 import { useSearchContext } from '../SearchContext';
-import { SearchAction } from '../types';
 
 import { getParameterPicker } from './pickers';
 import { ResultList } from './ResultList';

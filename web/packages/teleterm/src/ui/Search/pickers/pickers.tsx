@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { ParametrizedAction, SearchPicker } from '../types';
+import { ParametrizedAction } from '../actions';
 
 import { ActionPicker } from './ActionPicker';
 import { ParameterPicker } from './ParameterPicker';
@@ -19,3 +19,8 @@ export const getParameterPicker = (
     placeholder: parametrizedAction.parameter.placeholder,
   };
 };
+
+interface SearchPicker {
+  picker: React.ReactElement;
+  placeholder: string;
+}
