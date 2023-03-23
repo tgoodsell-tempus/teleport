@@ -177,7 +177,7 @@ message WatchStatusSpecV1 {
 ```
 
 
-#### Rules for types that implement `Events` / `NewWatcher()`
+#### Rules for `Events` / `NewWatcher()` implementations 
 
 At the beginning of every `NewWatcher(_ context.Context, w types.Watch)` a few invariants must be established:
 1. `w.Kinds` must not be empty.
@@ -220,11 +220,7 @@ the `AllowRejectedKinds` flag.
 message Watch {
    repeated WatchKind Kinds = 1;
    // *NEW field*
-   WatchOptions Options = 2;
-}
-
-message WatchOptions {
-   bool AllowRejectedKinds = 1;
+   bool AllowRejectedKinds = 2;
 }
 ```
 
