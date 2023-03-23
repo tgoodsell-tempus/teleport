@@ -9,6 +9,8 @@ state: draft
 ## Required approvers
 
 Engineering: @zmb3 @xacrimon @jakule
+Security: @reed || @jentfoo
+Product: @xinding33 || @klizhentas
 
 ## What
 
