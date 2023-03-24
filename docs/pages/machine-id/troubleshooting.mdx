@@ -304,16 +304,20 @@ Teleport clusters.
 E0322 22:53:31.653051    1699 memcache.go:265] couldn't get current server API group list: Get "https://teleport.example.com:443/api?timeout=32s": x509: certificate signed by unknown authority
 ```
 
-To confirm the TLS routing mode check the `proxy.tls_routing_enabled` from this command with your proxy address. 
-If the value is `false` then this is a non-TLS routing configuration.
+To confirm the TLS routing mode check the value of the `proxy.tls_routing_enabled` key with this command, substituting your proxy address:
+
 ```bash
 curl https://teleport.example.com:443/webapi/ping | jq
 ```
 
+If the value is `false` then this is a non-TLS routing configuration.
+```
+
 ### Explanation
 
-Non-TLS routing configured proxies use specific ports for types of traffic. That requires that a Kubernetes
-connection use its designated port. Currently Machine ID requires the Kubernetes public address is set
+Proxies configured with non-TLS routing"  use specific ports for various types
+of traffic. That requires that a Kubernetes
+connection use its designated port. Currently Machine ID requires that the Kubernetes public address is set
 to use the correct port. Otherwise it will use the Proxy web port which can cause these
 type of errors.
 
