@@ -17,11 +17,13 @@ limitations under the License.
 package common
 
 import (
+	"bufio"
 	"context"
 	"crypto/x509"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -37,11 +39,14 @@ import (
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/config"
 	"github.com/gravitational/teleport/lib/defaults"
+	"github.com/gravitational/teleport/lib/fixtures"
 )
 
 // TestDatabaseServerResource tests tctl db_server rm/get commands.
 func TestDatabaseServerResource(t *testing.T) {
 	dynAddr := newDynamicServiceAddr(t)
+	caCertFilePath := filepath.Join(t.TempDir(), "ca-cert.pem")
+	require.NoError(t, os.WriteFile(caCertFilePath, []byte(fixtures.TLSCACertPEM), 0644))
 
 	fileConfig := &config.FileConfig{
 		Global: config.Global{
@@ -63,6 +68,11 @@ func TestDatabaseServerResource(t *testing.T) {
 					Description: "Example2 MySQL",
 					Protocol:    "mysql",
 					URI:         "localhost:33307",
+					TLS: config.DatabaseTLS{
+						Mode:       "verify-ca",
+						ServerName: "db.example.com",
+						CACertFile: caCertFilePath,
+					},
 				},
 			},
 		},
@@ -81,6 +91,22 @@ func TestDatabaseServerResource(t *testing.T) {
 		},
 	}
 
+	wantDB, err := types.NewDatabaseV3(types.Metadata{
+		Name:        "example2",
+		Description: "Example2 MySQL",
+		Labels:      map[string]string{types.OriginLabel: types.OriginConfigFile},
+	}, types.DatabaseSpecV3{
+		Protocol: defaults.ProtocolMySQL,
+		URI:      "localhost:33307",
+		CACert:   fixtures.TLSCACertPEM,
+		TLS: types.DatabaseTLS{
+			Mode:       types.DatabaseTLSMode_VERIFY_CA,
+			ServerName: "db.example.com",
+			CACert:     fixtures.TLSCACertPEM,
+		},
+	})
+	require.NoError(t, err)
+
 	auth := makeAndRunTestAuthServer(t, withFileConfig(fileConfig), withFileDescriptors(dynAddr.descriptors))
 
 	waitForBackendDatabaseResourcePropagation(t, auth.GetAuthServer())
@@ -94,20 +120,25 @@ func TestDatabaseServerResource(t *testing.T) {
 		require.Len(t, out, 2)
 	})
 
-	server := fmt.Sprintf("%v/%v", types.KindDatabaseServer, out[0].GetName())
+	wantServer := fmt.Sprintf("%v/%v", types.KindDatabaseServer, wantDB.GetName())
 
 	t.Run("get specific database server", func(t *testing.T) {
-		buff, err := runResourceCommand(t, fileConfig, []string{"get", server, "--format=json"})
+		buff, err := runResourceCommand(t, fileConfig, []string{"get", wantServer, "--format=json"})
 		require.NoError(t, err)
 		mustDecodeJSON(t, buff, &out)
 		require.Len(t, out, 1)
+		gotDB := out[0].GetDatabase()
+		require.Equal(t, wantDB.GetCA(), gotDB.GetCA(), "ca not equal")
+		require.Empty(t, cmp.Diff([]types.Database{wantDB}, []types.Database{gotDB},
+			cmpopts.IgnoreFields(types.Metadata{}, "ID", "Namespace", "Expires"),
+		))
 	})
 
 	t.Run("remove database server", func(t *testing.T) {
-		_, err := runResourceCommand(t, fileConfig, []string{"rm", server})
+		_, err := runResourceCommand(t, fileConfig, []string{"rm", wantServer})
 		require.NoError(t, err)
 
-		_, err = runResourceCommand(t, fileConfig, []string{"get", server, "--format=json"})
+		_, err = runResourceCommand(t, fileConfig, []string{"get", wantServer, "--format=json"})
 		require.Error(t, err)
 		require.IsType(t, &trace.NotFoundError{}, err.(*trace.TraceErr).OrigError())
 
@@ -163,6 +194,11 @@ func TestDatabaseResource(t *testing.T) {
 	}, types.DatabaseSpecV3{
 		Protocol: defaults.ProtocolMySQL,
 		URI:      "localhost:3306",
+		TLS: types.DatabaseTLS{
+			Mode:       types.DatabaseTLSMode_VERIFY_CA,
+			ServerName: "db.example.com",
+			CACert:     fixtures.TLSCACertPEM,
+		},
 	})
 	require.NoError(t, err)
 
@@ -176,7 +212,8 @@ func TestDatabaseResource(t *testing.T) {
 
 	// Create the databases.
 	dbYAMLPath := filepath.Join(t.TempDir(), "db.yaml")
-	require.NoError(t, os.WriteFile(dbYAMLPath, []byte(dbYAML), 0644))
+	dbYAMLData := fmt.Sprintf(dbYAML, indent(fixtures.TLSCACertPEM, 6))
+	require.NoError(t, os.WriteFile(dbYAMLPath, []byte(dbYAMLData), 0644))
 	_, err = runResourceCommand(t, fileConfig, []string{"create", dbYAMLPath})
 	require.NoError(t, err)
 
@@ -184,6 +221,7 @@ func TestDatabaseResource(t *testing.T) {
 	buf, err = runResourceCommand(t, fileConfig, []string{"get", types.KindDatabase, "--format=json"})
 	require.NoError(t, err)
 	mustDecodeJSON(t, buf, &out)
+	require.Len(t, out, 2)
 	require.Empty(t, cmp.Diff([]*types.DatabaseV3{dbA, dbB}, out,
 		cmpopts.IgnoreFields(types.Metadata{}, "ID", "Namespace"),
 	))
@@ -192,6 +230,7 @@ func TestDatabaseResource(t *testing.T) {
 	buf, err = runResourceCommand(t, fileConfig, []string{"get", fmt.Sprintf("%v/db-b", types.KindDatabase), "--format=json"})
 	require.NoError(t, err)
 	mustDecodeJSON(t, buf, &out)
+	require.Len(t, out, 1)
 	require.Empty(t, cmp.Diff([]*types.DatabaseV3{dbB}, out,
 		cmpopts.IgnoreFields(types.Metadata{}, "ID", "Namespace"),
 	))
@@ -204,6 +243,7 @@ func TestDatabaseResource(t *testing.T) {
 	buf, err = runResourceCommand(t, fileConfig, []string{"get", types.KindDatabase, "--format=json"})
 	require.NoError(t, err)
 	mustDecodeJSON(t, buf, &out)
+	require.Len(t, out, 1)
 	require.Empty(t, cmp.Diff([]*types.DatabaseV3{dbB}, out,
 		cmpopts.IgnoreFields(types.Metadata{}, "ID", "Namespace"),
 	))
@@ -491,6 +531,17 @@ func TestCreateDatabaseInInsecureMode(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// indent returns the string where each line is indented by the specified
+// number of spaces.
+func indent(s string, spaces int) string {
+	var lines []string
+	scanner := bufio.NewScanner(strings.NewReader(s))
+	for scanner.Scan() {
+		lines = append(lines, fmt.Sprintf("%v%v", strings.Repeat(" ", spaces), scanner.Text()))
+	}
+	return strings.Join(lines, "\n")
+}
+
 const (
 	dbYAML = `kind: db
 version: v3
@@ -506,7 +557,12 @@ metadata:
   name: db-b
 spec:
   protocol: "mysql"
-  uri: "localhost:3306"`
+  uri: "localhost:3306"
+  tls:
+    mode: "verify-ca"
+    server_name: "db.example.com"
+    ca_cert: |-
+%v`
 
 	appYAML = `kind: app
 version: v3
