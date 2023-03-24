@@ -26,16 +26,17 @@ import React, {
 
 import { actionPicker, SearchPicker } from './pickers/pickers';
 
-const SearchContext = createContext<{
-  inputRef: MutableRefObject<HTMLInputElement>;
-  inputValue: string;
-  onInputValueChange(value: string): void;
-  changeActivePicker(picker: SearchPicker): void;
-  activePicker: SearchPicker;
-  close(): void;
-  open(): void;
-  opened: boolean;
-}>(null);
+const SearchContext =
+  createContext<{
+    inputRef: MutableRefObject<HTMLInputElement>;
+    inputValue: string;
+    onInputValueChange(value: string): void;
+    changeActivePicker(picker: SearchPicker): void;
+    activePicker: SearchPicker;
+    close(): void;
+    open(): void;
+    opened: boolean;
+  }>(null);
 
 export const SearchContextProvider: FC = props => {
   const inputRef = useRef<HTMLInputElement>();

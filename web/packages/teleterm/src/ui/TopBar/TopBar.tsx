@@ -26,7 +26,6 @@ import { Connections } from './Connections';
 import { Clusters } from './Clusters';
 import { Identity } from './Identity';
 import { NavigationMenu } from './NavigationMenu';
-import { SearchBarConnected } from 'teleterm/ui/Search/SearchBar';
 
 export function TopBar() {
   const { configService } = useAppContext();
@@ -39,7 +38,7 @@ export function TopBar() {
       </JustifyLeft>
       <CentralContainer>
         <Clusters />
-        {isSearchBarEnabled ? <SearchBarConnected /> : <QuickInput />}
+        {isSearchBarEnabled ? <SearchBar /> : <QuickInput />}
       </CentralContainer>
       <JustifyRight>
         <NavigationMenu />

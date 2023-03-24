@@ -14,4 +14,4 @@
  * limitations under the License.
  */
 
-export { SearchBar } from './SearchBar';
+export { SearchBarConnected as SearchBar } from './SearchBar';
