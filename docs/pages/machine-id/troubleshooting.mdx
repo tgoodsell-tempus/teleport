@@ -304,7 +304,8 @@ Teleport clusters.
 E0322 22:53:31.653051    1699 memcache.go:265] couldn't get current server API group list: Get "https://teleport.example.com:443/api?timeout=32s": x509: certificate signed by unknown authority
 ```
 
-To confirm the TLS routing mode check the `proxy.tls_routing_enabled` from this command with your proxy address.
+To confirm the TLS routing mode check the `proxy.tls_routing_enabled` from this command with your proxy address. 
+If the value is `false` then this is a non-TLS routing configuration.
 ```bash
 curl https://teleport.example.com:443/webapi/ping | jq
 ```
