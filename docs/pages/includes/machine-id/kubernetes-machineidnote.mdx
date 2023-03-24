@@ -6,7 +6,7 @@ For self-hosted Teleport Clusters that have non-TLS routing the Kubernetes publi
 address must be set for Machine ID Kubernetes connections.
 
 To confirm the TLS routing mode check the `proxy.tls_routing_enabled` from this
-command with your proxy address.
+command with your proxy address:
 
 ```bash
 curl https://teleport.example.com:443/webapi/ping | jq
