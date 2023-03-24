@@ -129,10 +129,10 @@ type Watch struct {
 	// are not available for watching.
 	AllowRejectedKinds bool
 
-	// *NEW* PreviouslyRejectedKinds contains a list of kinds rejected by upstream implementations in a chain of NewWatcher()
-	// calls. Must be empty if AllowRejectedKinds is not set. A kind cannot be on both Kinds and PreviouslyRejectedKinds
+	// *NEW* KindsRejectedInFlight contains a list of kinds rejected by upstream implementations in a chain of NewWatcher()
+	// calls. Must be empty if AllowRejectedKinds is not set. A kind cannot be on both Kinds and KindsRejectedInFlight
 	// at the same time.
-	PreviouslyRejectedKinds []WatchKind
+	KindsRejectedInFlight []WatchKind
 }
 ```
 
@@ -140,7 +140,7 @@ The new field `AllowRejectedKinds` should be added to preserve backwards compati
 crosses service boundary. If an old downstream service unaware of partial success mode connects to an upgraded auth server,
 it won't set this flag. In that case it should get an error if one of the kinds requested for watching is unavailable.
 
-`PreviouslyRejectedKinds` should be added to accommodate wrapper implementations of `Events` which perform validations
+`KindsRejectedInFlight` should be added to accommodate wrapper implementations of `Events` which perform validations
 and call the inner implementation. If `AllowRejectedKinds` is set and the wrapper determines that some of the requested
 kinds cannot be watched, they will be moved from Kinds to this new field and passed to the inner implementation this way.
 
@@ -169,13 +169,13 @@ message WatchStatusSpecV1 {
 
 At the beginning of every `NewWatcher(_ context.Context, w types.Watch)` a few invariants must be established:
 1. `w.Kinds` must not be empty.
-2. `w.PreviouslyRejectedKinds` must be empty unless `w.AllowRejectedKinds` is true.
-3. A kind+subkind cannot be on both `w.Kinds` and `w.PreviouslyRejectedKinds` at the same time.
+2. `w.KindsRejectedInFlight` must be empty unless `w.AllowRejectedKinds` is true.
+3. A kind+subkind cannot be on both `w.Kinds` and `w.KindsRejectedInFlight` at the same time.
 
 These can be implemented in a `CheckAndSetDefaults()` method on `types.Watch`.
 
 If, during validation, an implementation of `NewWatcher()` determines that a requested resource kind cannot be watched,
-moves it from `w.Kinds` to `w.PreviouslyRejectedKinds` and one of the above rules stops being satisfied, an error must 
+moves it from `w.Kinds` to `w.KindsRejectedInFlight` and one of the above rules stops being satisfied, an error must 
 be returned. To avoid breaking error handling in old clients, it should be the exact error value that led to the rejection
 and would've been immediately returned by the current version of code.
 
@@ -188,7 +188,7 @@ a subset of its event stream.
 When `NewWatcher()` is called on a Cache instance that's already in a healthy state - it knows which resource kinds
 it's actually receiving and which were rejected. Based on that, `NewWatcher()` can fail immediately
 if some of the requested resource kinds aren't available but `AllowRejectedKinds` isn't set. Otherwise, it can partially
-succeed and pass the list of unavailable resource kinds through `watch.PreviouslyRejectedKinds` all the way
+succeed and pass the list of unavailable resource kinds through `watch.KindsRejectedInFlight` all the way
 to `fanoutWatcher.init()` where it will generate an `OpInit` event with `WatchStatus` attached, listing the rejected
 kinds.
 
