@@ -176,7 +176,8 @@ These can be implemented in a `CheckAndSetDefaults()` method on `types.Watch`.
 If, during validation, an implementation of `NewWatcher()` determines that a requested resource kind cannot be watched,
 moves it from `w.Kinds` to `w.KindsRejectedInFlight` and one of the above rules stops being satisfied, an error must 
 be returned. To avoid breaking error handling in old clients, it should be the exact error value that led to the rejection
-and would've been immediately returned by the current version of code.
+and would've been immediately returned by the current version of code. Also, to avoid concurrency issues, when making
+changes to `w.Kinds`, a new slice should be allocated instead of modifying the original one.
 
 
 #### Implementation details: cache.Cache and cache.Fanout
