@@ -9,16 +9,18 @@ state: draft
 ## Required approvers
 
 Engineering: @zmb3 @xacrimon @jakule
+
 Security: @reed || @jentfoo
+
 Product: @xinding33 || @klizhentas
 
 ## What
 
-Approval process to allow file transfers during a web moderated session
+Extend web file transfers to work during moderated web sessions using an approval process
 
 ## Why
 
-Users have no ability to transfer files if their role requires a moderated session for the specified server, even if they are in an active and "valid" session currently.
+Users have no ability to transfer files if their role requires a moderated session for the specified server, even if they are in an active and launched session currently.
 Originally, we would allow file transfers regardless of moderated sessions which, while good for UX, goes against the purpose of moderated sessions in the first place. 
 We have disabled the functionality but would like to reintroduce it in a secure, moderated, and auditable way. 
 
@@ -39,12 +41,13 @@ Therefore, we need a way to let the server know that this request has been moder
 The proposed flow would look like this (simplified).
 ```mermaid
 sequenceDiagram
-Requester->>SSH Server: Send FileTransferRequest over websocket connection
+Requester->>Proxy: Send FileTransferRequest over websocket connection
+Proxy->>SSH Server: send request over ssh channel
 SSH Server->>Approvers: Create, store, and emit FileTransferRequest to participants
 Approvers->>SSH Server: Approve/Deny request
 Note over SSH Server,Approvers: Check to see if policy has been fulfilled by approval.<br />If not, wait for more responses.
 SSH Server->>Requester: Receive notification once approved with requestID
-Requester->>API Server: http request with sessionID and requestID appended to url params
+Requester->>Proxy: http request with sessionID and requestID appended to url params
 ```
 
 ### The FileTransferRequest 
@@ -92,7 +95,7 @@ type session struct {
 The benefit of storing it on the session, and not in an access-request-like object, is that once the session is gone, so is the approved request. 
 Keeping these approvals as ephemeral as possible is ideal. 
 
-### the fileTransferChannel 
+### Transfer request communication
 
 "How do we we send a FileTransferRequest anyway?". 
 We will add a new channel and event in `web/terminal.go` named `fileTransferC` Similar to `resizeC`, we can send an event+payload envelope with the current websocket implementation. 
@@ -196,8 +199,13 @@ We will have to add an MFA tap for approve/deny if MFA is required, but our sess
 
 
 ## Security Considerations
-Originally, an idea was thrown around to create a "signed" url with all the `FileTransferRequest` information encoded in it but this seemed unnecessary. Because the current flow stores the original request in the session, we aren't giving them full access to open any exec session, just one that matches the exact request that was asked for. Also, having the request stored in the session means that once the session is gone, there isn't a way to "re-request" it. 
+
+Originally, an idea was thrown around to create a "signed" url with all the `FileTransferRequest` information encoded in it but this seemed unnecessary. 
+Because the current flow stores the original request in the session, we aren't giving them full access to open any exec session, just one that matches the exact request that was asked for. 
+Also, having the request stored in the session means that once the session is gone, there isn't a way to "re-request" it. 
 
 I didn't speak above removing the request once it's been completed but that is a possibility. We can either
 1. Remove the request once it's been approved and executed
-2. Let the request live until the session is gone. This is less secure as it allows the user to download the file as many times as they want but would improve UX to not have to constantly ask for approval for the same file. I prefer option 1 and just take the UX hit in favor of security.
+2. Let the request live until the session is gone. This is less secure as it allows the user to download the file as many times as they want but would improve UX to not have to constantly ask for approval for the same file. 
+
+I prefer option 1 and just take the UX hit in favor of security.
