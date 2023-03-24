@@ -883,8 +883,9 @@ func (c *Config) ProxySpecified() bool {
 	return c.WebProxyAddr != ""
 }
 
-// DefaultResourceFilter returns the default list resource request.
-func (c *Config) DefaultResourceFilter() *proto.ListResourcesRequest {
+// ResourceFilter returns the default list resource request for the
+// provided resource kind.
+func (c *Config) ResourceFilter(kind string) *proto.ListResourcesRequest {
 	return &proto.ListResourcesRequest{
 		Namespace:           c.Namespace,
 		Labels:              c.Labels,
@@ -1179,7 +1180,7 @@ func (tc *TeleportClient) getTargetNodes(ctx context.Context, proxy *ProxyClient
 	}
 
 	// find the nodes matching the labels that were provided
-	nodes, err := proxy.FindNodesByFilters(ctx, *tc.DefaultResourceFilter())
+	nodes, err := proxy.FindNodesByFilters(ctx, *tc.ResourceFilter(types.KindNode))
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -2064,7 +2065,7 @@ func (tc *TeleportClient) ListNodesWithFilters(ctx context.Context) ([]types.Ser
 	}
 	defer proxyClient.Close()
 
-	servers, err := proxyClient.FindNodesByFilters(ctx, *tc.DefaultResourceFilter())
+	servers, err := proxyClient.FindNodesByFilters(ctx, *tc.ResourceFilter(types.KindNode))
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -2104,7 +2105,7 @@ func (tc *TeleportClient) ListNodesWithFiltersAllClusters(ctx context.Context) (
 	}
 	servers := make(map[string][]types.Server, len(clusters))
 	for _, cluster := range clusters {
-		s, err := proxyClient.FindNodesByFiltersForCluster(ctx, *tc.DefaultResourceFilter(), cluster.Name)
+		s, err := proxyClient.FindNodesByFiltersForCluster(ctx, *tc.ResourceFilter(types.KindNode), cluster.Name)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
@@ -2130,7 +2131,7 @@ func (tc *TeleportClient) ListAppServersWithFilters(ctx context.Context, customF
 
 	filter := customFilter
 	if filter == nil {
-		filter = tc.DefaultResourceFilter()
+		filter = tc.ResourceFilter(types.KindAppServer)
 	}
 
 	servers, err := proxyClient.FindAppServersByFilters(ctx, *filter)
@@ -2151,7 +2152,7 @@ func (tc *TeleportClient) listAppServersWithFiltersAllClusters(ctx context.Conte
 
 	filter := customFilter
 	if customFilter == nil {
-		filter = tc.DefaultResourceFilter()
+		filter = tc.ResourceFilter(types.KindAppServer)
 	}
 
 	clusters, err := proxyClient.GetSites(ctx)
@@ -2277,7 +2278,7 @@ func (tc *TeleportClient) ListDatabaseServersWithFilters(ctx context.Context, cu
 
 	filter := customFilter
 	if filter == nil {
-		filter = tc.DefaultResourceFilter()
+		filter = tc.ResourceFilter(types.KindDatabaseServer)
 	}
 
 	servers, err := proxyClient.FindDatabaseServersByFilters(ctx, *filter)
@@ -2298,7 +2299,7 @@ func (tc *TeleportClient) listDatabaseServersWithFiltersAllClusters(ctx context.
 
 	filter := customFilter
 	if customFilter == nil {
-		filter = tc.DefaultResourceFilter()
+		filter = tc.ResourceFilter(types.KindDatabaseServer)
 	}
 
 	clusters, err := proxyClient.GetSites(ctx)

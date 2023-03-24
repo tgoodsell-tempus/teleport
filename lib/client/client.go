@@ -727,7 +727,6 @@ func (proxy *ProxyClient) GetClusterAlerts(ctx context.Context, req types.GetClu
 
 // FindNodesByFiltersForCluster returns list of the nodes in a specified cluster which have filters matched.
 func (proxy *ProxyClient) FindNodesByFiltersForCluster(ctx context.Context, req proto.ListResourcesRequest, cluster string) ([]types.Server, error) {
-	req.ResourceType = types.KindNode
 	ctx, span := proxy.Tracer.Start(
 		ctx,
 		"proxyClient/FindNodesByFiltersForCluster",
@@ -795,7 +794,6 @@ func (proxy *ProxyClient) FindAppServersByFiltersForCluster(ctx context.Context,
 	)
 	defer span.End()
 
-	req.ResourceType = types.KindAppServer
 	authClient, err := proxy.ConnectToCluster(ctx, cluster)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -942,7 +940,6 @@ func (proxy *ProxyClient) FindDatabaseServersByFilters(ctx context.Context, req 
 
 // FindDatabaseServersByFiltersForCluster returns all registered database proxy servers in the provided cluster.
 func (proxy *ProxyClient) FindDatabaseServersByFiltersForCluster(ctx context.Context, req proto.ListResourcesRequest, cluster string) ([]types.DatabaseServer, error) {
-	req.ResourceType = types.KindDatabaseServer
 	ctx, span := proxy.Tracer.Start(
 		ctx,
 		"proxyClient/FindDatabaseServersByFiltersForCluster",

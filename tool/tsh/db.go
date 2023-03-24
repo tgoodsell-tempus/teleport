@@ -76,7 +76,7 @@ func onListDatabases(cf *CLIConf) error {
 	}
 	defer proxy.Close()
 
-	databases, err := proxy.FindDatabasesByFiltersForCluster(cf.Context, *tc.DefaultResourceFilter(), tc.SiteName)
+	databases, err := proxy.FindDatabasesByFiltersForCluster(cf.Context, *tc.ResourceFilter(types.KindDatabase), tc.SiteName)
 	if err != nil {
 		return trace.Wrap(err)
 	}
@@ -162,6 +162,7 @@ func listDatabasesAllClusters(cf *CLIConf) error {
 	)
 	for _, cluster := range clusters {
 		cluster := cluster
+		cluster.req.ResourceType = types.KindNode
 		if cluster.connectionError != nil {
 			mu.Lock()
 			errors = append(errors, cluster.connectionError)

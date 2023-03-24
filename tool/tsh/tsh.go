@@ -2039,7 +2039,12 @@ func getClusterClients(cf *CLIConf) ([]*clusterClient, error) {
 				proxy:   proxy,
 				profile: profile,
 				name:    site.Name,
-				req:     *tc.DefaultResourceFilter(),
+				req: proto.ListResourcesRequest{
+					Namespace:           tc.Namespace,
+					Labels:              tc.Labels,
+					SearchKeywords:      tc.SearchKeywords,
+					PredicateExpression: tc.PredicateExpression,
+				},
 			})
 		}
 
@@ -2105,6 +2110,7 @@ func listNodesAllClusters(cf *CLIConf) error {
 
 	for _, cluster := range clusters {
 		cluster := cluster
+		cluster.req.ResourceType = types.KindNode
 		if cluster.connectionError != nil {
 			mu.Lock()
 			errors = append(errors, cluster.connectionError)
