@@ -117,22 +117,21 @@ None of the proposed changes to the interface are direct though. They all happen
 
 
 #### types.Watch
-```go
-// Watch sets up watch on the event
+```diff
 type Watch struct {
 	Name string
 	Kinds []WatchKind
 	QueueSize int
 	MetricComponent string
-
-	// *NEW* AllowRejectedKinds enables partial success mode in which the request won't fail if some of the requested Kinds
-	// are not available for watching.
-	AllowRejectedKinds bool
-
-	// *NEW* KindsRejectedInFlight contains a list of kinds rejected by upstream implementations in a chain of NewWatcher()
-	// calls. Must be empty if AllowRejectedKinds is not set. A kind cannot be on both Kinds and KindsRejectedInFlight
-	// at the same time.
-	KindsRejectedInFlight []WatchKind
++
++	// AllowRejectedKinds enables partial success mode in which the request won't fail if some of the requested Kinds
++	// are not available for watching.
++	AllowRejectedKinds bool
++
++	// KindsRejectedInFlight contains a list of kinds rejected by upstream implementations in a chain of NewWatcher()
++	// calls. Must be empty if AllowRejectedKinds is not set. A kind cannot be on both Kinds and KindsRejectedInFlight
++	// at the same time.
++	KindsRejectedInFlight []WatchKind
 }
 ```
 
@@ -204,11 +203,10 @@ re-check if the request conditions are still met. Some might need to close with 
 to it, we'll need to make a small update to the API protocol and add a field that will be used to pass 
 the `AllowRejectedKinds` flag.
 
-```protobuf
+```diff
 message Watch {
    repeated WatchKind Kinds = 1;
-   // *NEW field*
-   bool AllowRejectedKinds = 2;
++   bool AllowRejectedKinds = 2;
 }
 ```
 
