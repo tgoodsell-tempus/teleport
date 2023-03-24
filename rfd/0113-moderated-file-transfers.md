@@ -45,21 +45,25 @@ Proxy->>SSH Server: send request over ssh channel
 SSH Server->>Approvers: Create, store, and emit FileTransferRequest to participants
 Approvers->>SSH Server: Approve/Deny request
 Note over SSH Server,Approvers: Check to see if policy has been fulfilled by approval.<br />If not, wait for more responses.
-SSH Server->>Requester: Receive notification once approved with requestID
-Requester->>Proxy: http request with sessionID and requestID appended to url params
+SSH Server->>Requester: Receive notification once approved with commandRequestID
+Requester->>Proxy: http request with sessionID and commandRequestID appended to url params
 ```
 
 ### The FileTransferRequest 
 
 The general idea of the solution is to provide a way for users to "request-a-request" that can be approved by moderators. 
-An example of a file transfer specific struct could look like
+When a request is made via the web UI, the ui will determine if the request will require an approval process. 
+Only moderated sessions will require this process. If the launched session is not a moderated session, we can pass a file transfer request as normal. 
+The UI currently doesn't have an explicit flag stating if it is in a moderated session or not, so we will have to pass this value back to the UI with the rest of the [SessionMetadata](https://github.com/gravitational/teleport/blob/master/web/packages/teleport/src/services/session/types.ts#L44) on session init
 
 ```go
 type FileTransferRequest {
     id string // UUID
-    user string
+	// requester is the Teleport User that requested the file transfer
+    requester string
     sessionID string
     filePath string
+	// approvers is a list of participants of moderator or peer type that have approved the request
     approvers []*party
     sink bool // upload or download
 }
@@ -68,13 +72,15 @@ type FileTransferRequest {
 We can add any relevant information otherwise needed. 
 File-size was considered, but imagine a user trying to download a log file that could have changed size by the time the request flow has completed. 
 
-Because this struct is going to allow an exec command to go through, we could abstract it further to _any_ SSHRequest being passed instead with a struct like below
+Because this struct is going to allow an exec command to go through. A `ssh.Request` already exists in the `ServerContext` that is [passed into](https://github.com/gravitational/teleport/blob/master/lib/srv/sess.go#L277) `OpenExecSession`. We can abstract it instead with a struct like below.
 
 ```go
 type ModeratedSSHRequest {
     id string // UUID
-    user string
+	// requester is the Teleport User that requested the command
+    requester string
     sessionID string
+	// approvers is a list of participants of moderator or peer type that have approved the request
     approvers []*party
     sshRequest *ssh.Request
 }
@@ -144,18 +150,18 @@ OnApprove:
 	2. Broadcast/audit event
 	3. We can then use a policy checker to see if the approvers fulfill any moderation policy on the original requester. We can treat this check the same as the `checkIfStart` conditional for opening a session. If this comes back true, we notify the original requester with an event containing the ID of the `FileTransferRequest`
 
-Once the client receives this final "approved" message, we can automatically send a "normal" SCP request (over HTTP) with two new optional params, `sessionID` and `requestID` (similar to the new optional `webauthn` param in this same request). The benefits of using the normal SCP request is that we can conditionally choose to skip this entire approval process flow for non-moderated sessions. 
+Once the client receives this final "approved" message, we can automatically send a "normal" SCP request (over HTTP) with two new optional params, `sessionID` and `commandRequestId` (similar to the new optional `webauthn` param in this same request). The benefits of using the normal SCP request is that we can conditionally choose to skip this entire approval process flow for non-moderated sessions. 
 If the session is not moderated, just send the scp request as usual. If it is, do the song and dance perscribed above.
 
 ### Updated file transfer api handler
 
-Not much will change here. The only difference is adding the `requestID` and `sessionID` as env vars in the `serverContext`. This will allow us to extend our `SessionRegistry.OpenExecSession` method with a new check like `isApprovedRequest`
+Not much will change here. The only difference is adding the `commandRequestId` and `sessionID` as env vars, `COMMAND_REQUEST_ID` and `SESSION_ID` respectively,  in the `serverContext`. This will allow us to extend our `SessionRegistry.OpenExecSession` method with a new check like `isApprovedFileTransfer`
 
 ```go
-func (s *SessionRegistry) isApprovedRequest(ctx context.Context, scx *ServerContext) (bool error) {
+func (s *SessionRegistry) isApprovedFileTransfer(ctx context.Context, scx *ServerContext) (bool error) {
 	// fetch session from registry with sessionID
 
-	// find request in the session by requestID
+	// find command request in the session by commandRequestID
 
 	// validate incoming request (user/file/direction/etc) against the stored request
 
@@ -168,7 +174,7 @@ Then our `OpenExecSession` can be updated:
 ```go
 func (s *SessionRegistry) OpenExecSession(ctx context.Context, channel ssh.Channel, scx *ServerContext) error {
 	// ...
-	if !canStart && !isApprovedRequest {
+	if !canStart && !isApprovedFileTransfer {
 		return errCannotStartUnattendedSession
 	}
 
