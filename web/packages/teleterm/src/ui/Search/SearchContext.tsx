@@ -34,6 +34,7 @@ const SearchContext =
     changeActivePicker(picker: SearchPicker): void;
     activePicker: SearchPicker;
     close(): void;
+    closeAndResetInput(): void;
     open(): void;
     opened: boolean;
   }>(null);
@@ -54,6 +55,11 @@ export const SearchContextProvider: FC = props => {
     setActivePicker(actionPicker);
   }, []);
 
+  const closeAndResetInput = useCallback(() => {
+    close();
+    setInputValue('');
+  }, [close]);
+
   function open(): void {
     setOpened(true);
     inputRef.current?.focus();
@@ -68,6 +74,7 @@ export const SearchContextProvider: FC = props => {
         changeActivePicker,
         activePicker,
         close,
+        closeAndResetInput,
         opened,
         open,
       }}

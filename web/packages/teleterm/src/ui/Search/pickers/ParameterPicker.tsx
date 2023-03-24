@@ -29,7 +29,8 @@ interface ParameterPickerProps {
 }
 
 export function ParameterPicker(props: ParameterPickerProps) {
-  const { inputValue, close, changeActivePicker } = useSearchContext();
+  const { inputValue, closeAndResetInput, changeActivePicker } =
+    useSearchContext();
   const [suggestionsAttempt, fetch] = useAsync(
     props.action.parameter.getSuggestions
   );
@@ -54,9 +55,9 @@ export function ParameterPicker(props: ParameterPickerProps) {
   const onPick = useCallback(
     (item: string) => {
       props.action.perform(item);
-      close();
+      closeAndResetInput();
     },
-    [close, props.action]
+    [closeAndResetInput, props.action]
   );
 
   const onBack = useCallback(() => {

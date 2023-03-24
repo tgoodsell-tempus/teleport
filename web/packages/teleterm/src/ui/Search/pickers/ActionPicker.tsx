@@ -53,8 +53,9 @@ export function ActionPicker() {
   const ctx = useAppContext();
   const { clustersService } = ctx;
 
-  const [searchAttempt, fetch, setAttempt] = useAsync(useSearch());
-  const { inputValue, changeActivePicker, close } = useSearchContext();
+  const [searchAttempt, search, setAttempt] = useAsync(useSearch());
+  const { inputValue, changeActivePicker, close, closeAndResetInput } =
+    useSearchContext();
   const debouncedInputValue = useDebounce(inputValue, 200);
 
   const attempt = useMemo(
@@ -78,25 +79,32 @@ export function ActionPicker() {
     [clustersService]
   );
 
+  // Reset the attempt if input gets cleaned. If we did that in useEffect on debouncedInputValue,
+  // then if you typed in something, then cleared the input and started typing something new,
+  // you'd see stale results for a brief second.
+  if (inputValue === '' && attempt.status !== '') {
+    setAttempt(makeEmptyAttempt());
+  }
+
   useEffect(() => {
     if (debouncedInputValue) {
-      fetch(debouncedInputValue);
-    } else {
-      setAttempt(makeEmptyAttempt());
+      search(debouncedInputValue);
     }
-  }, [debouncedInputValue]);
+  }, [debouncedInputValue, search]);
 
   const onPick = useCallback(
     (action: SearchAction) => {
+      setAttempt(makeEmptyAttempt());
+
       if (action.type === 'simple-action') {
         action.perform();
-        close();
+        closeAndResetInput();
       }
       if (action.type === 'parametrized-action') {
         changeActivePicker(getParameterPicker(action));
       }
     },
-    [changeActivePicker, close]
+    [changeActivePicker, closeAndResetInput]
   );
 
   if (!inputValue) {
