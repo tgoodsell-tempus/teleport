@@ -120,13 +120,13 @@ func (m *mockServer) Ping(ctx context.Context, req *proto.PingRequest) (*proto.P
 }
 
 func (m *mockServer) ListResources(ctx context.Context, req *proto.ListResourcesRequest) (*proto.ListResourcesResponse, error) {
-	resources, err := testResources(req.ResourceType, req.Namespace)
+	resources, err := testResources[types.ResourceWithLabels](req.ResourceType, req.Namespace)
 	if err != nil {
 		return nil, trail.ToGRPC(err)
 	}
 
 	resp := &proto.ListResourcesResponse{
-		Resources:  make([]*proto.PaginatedResource, 0),
+		Resources:  make([]*proto.PaginatedResource, 0, len(resources)),
 		TotalCount: int32(len(resources)),
 	}
 
@@ -203,18 +203,19 @@ func (m *mockServer) AddMFADeviceSync(ctx context.Context, req *proto.AddMFADevi
 
 const fiveMBNode = "fiveMBNode"
 
-func testResources(resourceType, namespace string) ([]types.ResourceWithLabels, error) {
-	var err error
+func testResources[T types.ResourceWithLabels](resourceType, namespace string) ([]T, error) {
 	size := 50
 	// Artificially make each node ~ 100KB to force
 	// ListResources to fail with chunks of >= 40.
 	labelSize := 100000
-	resources := make([]types.ResourceWithLabels, size)
+	resources := make([]T, 0, size)
+
+	var resourceWithLabels types.ResourceWithLabels
 
 	switch resourceType {
 	case types.KindDatabaseServer:
 		for i := 0; i < size; i++ {
-			resources[i], err = types.NewDatabaseServerV3(types.Metadata{
+			resource, err := types.NewDatabaseServerV3(types.Metadata{
 				Name: fmt.Sprintf("db-%d", i),
 				Labels: map[string]string{
 					"label": string(make([]byte, labelSize)),
@@ -225,10 +226,12 @@ func testResources(resourceType, namespace string) ([]types.ResourceWithLabels, 
 				Hostname: "localhost",
 				HostID:   fmt.Sprintf("host-%d", i),
 			})
-
 			if err != nil {
 				return nil, trace.Wrap(err)
 			}
+
+			resourceWithLabels = resource
+			resources = append(resources, resourceWithLabels.(T))
 		}
 	case types.KindAppServer:
 		for i := 0; i < size; i++ {
@@ -241,7 +244,7 @@ func testResources(resourceType, namespace string) ([]types.ResourceWithLabels, 
 				return nil, trace.Wrap(err)
 			}
 
-			resources[i], err = types.NewAppServerV3(types.Metadata{
+			resource, err := types.NewAppServerV3(types.Metadata{
 				Name: fmt.Sprintf("app-%d", i),
 				Labels: map[string]string{
 					"label": string(make([]byte, labelSize)),
@@ -254,6 +257,9 @@ func testResources(resourceType, namespace string) ([]types.ResourceWithLabels, 
 			if err != nil {
 				return nil, trace.Wrap(err)
 			}
+
+			resourceWithLabels = resource
+			resources = append(resources, resourceWithLabels.(T))
 		}
 	case types.KindNode:
 		for i := 0; i < size; i++ {
@@ -265,7 +271,7 @@ func testResources(resourceType, namespace string) ([]types.ResourceWithLabels, 
 			}
 
 			var err error
-			resources[i], err = types.NewServerWithLabels(fmt.Sprintf("node-%d", i), types.KindNode, types.ServerSpecV2{},
+			resource, err := types.NewServerWithLabels(fmt.Sprintf("node-%d", i), types.KindNode, types.ServerSpecV2{},
 				map[string]string{
 					"label": string(make([]byte, nodeLabelSize)),
 				},
@@ -273,6 +279,9 @@ func testResources(resourceType, namespace string) ([]types.ResourceWithLabels, 
 			if err != nil {
 				return nil, trace.Wrap(err)
 			}
+
+			resourceWithLabels = resource
+			resources = append(resources, resourceWithLabels.(T))
 		}
 	case types.KindKubeServer:
 		for i := 0; i < size; i++ {
@@ -287,7 +296,7 @@ func testResources(resourceType, namespace string) ([]types.ResourceWithLabels, 
 			if err != nil {
 				return nil, trace.Wrap(err)
 			}
-			resources[i], err = types.NewKubernetesServerV3(
+			resource, err := types.NewKubernetesServerV3(
 				types.Metadata{
 					Name: name,
 					Labels: map[string]string{
@@ -302,12 +311,15 @@ func testResources(resourceType, namespace string) ([]types.ResourceWithLabels, 
 			if err != nil {
 				return nil, trace.Wrap(err)
 			}
+
+			resourceWithLabels = resource
+			resources = append(resources, resourceWithLabels.(T))
 		}
 	case types.KindWindowsDesktop:
 		for i := 0; i < size; i++ {
 			var err error
 			name := fmt.Sprintf("windows-desktop-%d", i)
-			resources[i], err = types.NewWindowsDesktopV3(
+			resource, err := types.NewWindowsDesktopV3(
 				name,
 				map[string]string{"label": string(make([]byte, labelSize))},
 				types.WindowsDesktopSpecV3{
@@ -317,8 +329,10 @@ func testResources(resourceType, namespace string) ([]types.ResourceWithLabels, 
 			if err != nil {
 				return nil, trace.Wrap(err)
 			}
-		}
 
+			resourceWithLabels = resource
+			resources = append(resources, resourceWithLabels.(T))
+		}
 	default:
 		return nil, trace.Errorf("unsupported resource type %s", resourceType)
 	}
@@ -578,6 +592,186 @@ func TestGetResources(t *testing.T) {
 	clt, err := srv.NewClient(ctx)
 	require.NoError(t, err)
 
+	t.Run("DatabaseServer", func(t *testing.T) {
+		t.Parallel()
+		expectedResources, err := testResources[types.DatabaseServer](types.KindDatabaseServer, defaults.Namespace)
+		require.NoError(t, err)
+
+		// Test listing everything at once errors with limit exceeded.
+		_, err = clt.ListResources(ctx, proto.ListResourcesRequest{
+			Namespace:    defaults.Namespace,
+			Limit:        int32(len(expectedResources)),
+			ResourceType: types.KindDatabaseServer,
+		})
+		require.Error(t, err)
+		require.IsType(t, &trace.LimitExceededError{}, err.(*trace.TraceErr).OrigError())
+
+		// Test getting a page of resources
+		resources, total, err := GetResourcePage[types.DatabaseServer](ctx, clt, &proto.ListResourcesRequest{
+			Namespace:      defaults.Namespace,
+			ResourceType:   types.KindDatabaseServer,
+			NeedTotalCount: true,
+		})
+		require.NoError(t, err)
+		require.Len(t, expectedResources, total)
+		require.Empty(t, cmp.Diff(expectedResources[:len(resources)], resources))
+
+		// Test getting all resources by chunks to handle limit exceeded.
+		resources, err = GetAllResources[types.DatabaseServer](ctx, clt, &proto.ListResourcesRequest{
+			Namespace:    defaults.Namespace,
+			ResourceType: types.KindDatabaseServer,
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, len(expectedResources))
+		require.Empty(t, cmp.Diff(expectedResources, resources))
+	})
+
+	t.Run("ApplicationServer", func(t *testing.T) {
+		t.Parallel()
+		expectedResources, err := testResources[types.AppServer](types.KindAppServer, defaults.Namespace)
+		require.NoError(t, err)
+
+		// Test listing everything at once errors with limit exceeded.
+		_, err = clt.ListResources(ctx, proto.ListResourcesRequest{
+			Namespace:    defaults.Namespace,
+			Limit:        int32(len(expectedResources)),
+			ResourceType: types.KindAppServer,
+		})
+		require.Error(t, err)
+		require.IsType(t, &trace.LimitExceededError{}, err.(*trace.TraceErr).OrigError())
+
+		// Test getting a page of resources
+		resources, total, err := GetResourcePage[types.AppServer](ctx, clt, &proto.ListResourcesRequest{
+			Namespace:      defaults.Namespace,
+			ResourceType:   types.KindAppServer,
+			NeedTotalCount: true,
+		})
+		require.NoError(t, err)
+		require.Len(t, expectedResources, total)
+		require.Empty(t, cmp.Diff(expectedResources[:len(resources)], resources))
+
+		// Test getting all resources by chunks to handle limit exceeded.
+		resources, err = GetAllResources[types.AppServer](ctx, clt, &proto.ListResourcesRequest{
+			Namespace:    defaults.Namespace,
+			ResourceType: types.KindAppServer,
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, len(expectedResources))
+		require.Empty(t, cmp.Diff(expectedResources, resources))
+	})
+
+	t.Run("Node", func(t *testing.T) {
+		t.Parallel()
+		expectedResources, err := testResources[types.Server](types.KindNode, defaults.Namespace)
+		require.NoError(t, err)
+
+		// Test listing everything at once errors with limit exceeded.
+		_, err = clt.ListResources(ctx, proto.ListResourcesRequest{
+			Namespace:    defaults.Namespace,
+			Limit:        int32(len(expectedResources)),
+			ResourceType: types.KindNode,
+		})
+		require.Error(t, err)
+		require.IsType(t, &trace.LimitExceededError{}, err.(*trace.TraceErr).OrigError())
+
+		// Test getting a page of resources
+		resources, total, err := GetResourcePage[types.Server](ctx, clt, &proto.ListResourcesRequest{
+			Namespace:      defaults.Namespace,
+			ResourceType:   types.KindNode,
+			NeedTotalCount: true,
+		})
+		require.NoError(t, err)
+		require.Len(t, expectedResources, total)
+		require.Empty(t, cmp.Diff(expectedResources[:len(resources)], resources))
+
+		// Test getting all resources by chunks to handle limit exceeded.
+		resources, err = GetAllResources[types.Server](ctx, clt, &proto.ListResourcesRequest{
+			Namespace:    defaults.Namespace,
+			ResourceType: types.KindNode,
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, len(expectedResources))
+		require.Empty(t, cmp.Diff(expectedResources, resources))
+	})
+
+	t.Run("KubeServer", func(t *testing.T) {
+		t.Parallel()
+		expectedResources, err := testResources[types.KubeServer](types.KindKubeServer, defaults.Namespace)
+		require.NoError(t, err)
+
+		// Test listing everything at once errors with limit exceeded.
+		_, err = clt.ListResources(ctx, proto.ListResourcesRequest{
+			Namespace:    defaults.Namespace,
+			Limit:        int32(len(expectedResources)),
+			ResourceType: types.KindKubeServer,
+		})
+		require.Error(t, err)
+		require.IsType(t, &trace.LimitExceededError{}, err.(*trace.TraceErr).OrigError())
+
+		// Test getting a page of resources
+		resources, total, err := GetResourcePage[types.KubeServer](ctx, clt, &proto.ListResourcesRequest{
+			Namespace:      defaults.Namespace,
+			ResourceType:   types.KindKubeServer,
+			NeedTotalCount: true,
+		})
+		require.NoError(t, err)
+		require.Len(t, expectedResources, total)
+		require.Empty(t, cmp.Diff(expectedResources[:len(resources)], resources))
+
+		// Test getting all resources by chunks to handle limit exceeded.
+		resources, err = GetAllResources[types.KubeServer](ctx, clt, &proto.ListResourcesRequest{
+			Namespace:    defaults.Namespace,
+			ResourceType: types.KindKubeServer,
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, len(expectedResources))
+		require.Empty(t, cmp.Diff(expectedResources, resources))
+	})
+
+	t.Run("WindowsDesktop", func(t *testing.T) {
+		t.Parallel()
+		expectedResources, err := testResources[types.WindowsDesktop](types.KindWindowsDesktop, defaults.Namespace)
+		require.NoError(t, err)
+
+		// Test listing everything at once errors with limit exceeded.
+		_, err = clt.ListResources(ctx, proto.ListResourcesRequest{
+			Namespace:    defaults.Namespace,
+			Limit:        int32(len(expectedResources)),
+			ResourceType: types.KindWindowsDesktop,
+		})
+		require.Error(t, err)
+		require.IsType(t, &trace.LimitExceededError{}, err.(*trace.TraceErr).OrigError())
+
+		// Test getting a page of resources
+		resources, total, err := GetResourcePage[types.WindowsDesktop](ctx, clt, &proto.ListResourcesRequest{
+			Namespace:      defaults.Namespace,
+			ResourceType:   types.KindWindowsDesktop,
+			NeedTotalCount: true,
+		})
+		require.NoError(t, err)
+		require.Len(t, expectedResources, total)
+		require.Empty(t, cmp.Diff(expectedResources[:len(resources)], resources))
+
+		// Test getting all resources by chunks to handle limit exceeded.
+		resources, err = GetAllResources[types.WindowsDesktop](ctx, clt, &proto.ListResourcesRequest{
+			Namespace:    defaults.Namespace,
+			ResourceType: types.KindWindowsDesktop,
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, len(expectedResources))
+		require.Empty(t, cmp.Diff(expectedResources, resources))
+	})
+}
+
+func TestGetResourcesWithFilters(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := startMockServer(t)
+
+	// Create client
+	clt, err := srv.NewClient(ctx)
+	require.NoError(t, err)
+
 	testCases := map[string]struct {
 		resourceType string
 	}{
@@ -599,8 +793,10 @@ func TestGetResources(t *testing.T) {
 	}
 
 	for name, test := range testCases {
+		name, test := name, test
 		t.Run(name, func(t *testing.T) {
-			expectedResources, err := testResources(test.resourceType, defaults.Namespace)
+			t.Parallel()
+			expectedResources, err := testResources[types.ResourceWithLabels](test.resourceType, defaults.Namespace)
 			require.NoError(t, err)
 
 			// Test listing everything at once errors with limit exceeded.

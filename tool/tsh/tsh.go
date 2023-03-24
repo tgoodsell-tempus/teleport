@@ -2126,7 +2126,7 @@ func listNodesAllClusters(cf *CLIConf) error {
 			defer span.End()
 
 			logger := log.WithField("cluster", cluster.name)
-			nodes, err := cluster.proxy.FindNodesByFiltersForCluster(ctx, cluster.req, cluster.name)
+			nodes, err := cluster.proxy.FindNodesByFiltersForCluster(ctx, &cluster.req, cluster.name)
 			if err != nil {
 				logger.Errorf("Failed to get nodes: %v.", err)
 
@@ -2902,7 +2902,8 @@ func accessRequestForSSH(ctx context.Context, tc *client.TeleportClient) (types.
 
 	// Match on hostname or host ID, user could have given either
 	expr := fmt.Sprintf(hostnameOrIDPredicateTemplate, tc.Host)
-	filter := proto.ListResourcesRequest{
+	filter := &proto.ListResourcesRequest{
+		ResourceType:        types.KindNode,
 		UseSearchAsRoles:    true,
 		PredicateExpression: expr,
 	}

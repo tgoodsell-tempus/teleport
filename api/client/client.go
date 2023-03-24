@@ -1885,20 +1885,12 @@ func (c *Client) GetNode(ctx context.Context, namespace, name string) (types.Ser
 
 // GetNodes returns a complete list of nodes that the user has access to in the given namespace.
 func (c *Client) GetNodes(ctx context.Context, namespace string) ([]types.Server, error) {
-	resources, err := GetResourcesWithFilters(ctx, c, proto.ListResourcesRequest{
+	servers, err := GetAllResources[types.Server](ctx, c, &proto.ListResourcesRequest{
 		ResourceType: types.KindNode,
 		Namespace:    namespace,
 	})
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
 
-	servers, err := types.ResourcesWithLabels(resources).AsServers()
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-
-	return servers, nil
+	return servers, trace.Wrap(err)
 }
 
 // UpsertNode is used by SSH servers to report their presence
@@ -2712,7 +2704,7 @@ func (c *Client) GenerateCertAuthorityCRL(ctx context.Context, req *proto.CertAu
 // ListResources returns a paginated list of nodes that the user has access to.
 // `nextKey` is used as `startKey` in another call to ListResources to retrieve
 // the next page. If you want to list all resources pages, check the
-// `GetResources` function.
+// `GetResourcesWithFilters` function.
 // It will return a `trace.LimitExceeded` error if the page exceeds gRPC max
 // message size.
 func (c *Client) ListResources(ctx context.Context, req proto.ListResourcesRequest) (*types.ListResourcesResponse, error) {
@@ -2754,6 +2746,110 @@ func (c *Client) ListResources(ctx context.Context, req proto.ListResourcesReque
 		NextKey:    resp.NextKey,
 		TotalCount: int(resp.TotalCount),
 	}, nil
+}
+
+// GetResources returns a paginated list of resources that the user has access to.
+// `nextKey` is used as `startKey` in another call to GetResources to retrieve
+// the next page.
+// It will return a `trace.LimitExceeded` error if the page exceeds gRPC max
+// message size.
+func (c *Client) GetResources(ctx context.Context, req *proto.ListResourcesRequest) (*proto.ListResourcesResponse, error) {
+	if err := req.CheckAndSetDefaults(); err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	resp, err := c.grpc.ListResources(ctx, req, c.callOpts...)
+	return resp, trail.FromGRPC(err)
+}
+
+// GetResourcesClient is an interface used by GetResources to abstract over implementations of
+// the ListResources method.
+type GetResourcesClient interface {
+	GetResources(ctx context.Context, req *proto.ListResourcesRequest) (*proto.ListResourcesResponse, error)
+}
+
+// GetResourcePage is a helper for getting a single page of resources that match the provide request.
+func GetResourcePage[T types.ResourceWithLabels](ctx context.Context, clt GetResourcesClient, req *proto.ListResourcesRequest) ([]T, int, error) {
+	var out []T
+
+	// Set the limit to the default size.
+	req.Limit = int32(defaults.DefaultChunkSize)
+	for {
+		resp, err := clt.GetResources(ctx, req)
+		if err != nil {
+			if trace.IsLimitExceeded(err) {
+				// Cut chunkSize in half if gRPC max message size is exceeded.
+				req.Limit /= 2
+				// This is an extremely unlikely scenario, but better to cover it anyways.
+				if req.Limit == 0 {
+					return nil, 0, trace.Wrap(trail.FromGRPC(err), "resource is too large to retrieve")
+				}
+
+				continue
+			}
+
+			return nil, 0, trail.FromGRPC(err)
+		}
+
+		req.StartKey = resp.NextKey
+
+		for _, respResource := range resp.Resources {
+			var resource types.ResourceWithLabels
+			switch req.ResourceType {
+			case types.KindDatabaseServer:
+				resource = respResource.GetDatabaseServer()
+			case types.KindDatabaseService:
+				resource = respResource.GetDatabaseService()
+			case types.KindAppServer:
+				resource = respResource.GetAppServer()
+			case types.KindNode:
+				resource = respResource.GetNode()
+			case types.KindWindowsDesktop:
+				resource = respResource.GetWindowsDesktop()
+			case types.KindWindowsDesktopService:
+				resource = respResource.GetWindowsDesktopService()
+			case types.KindKubernetesCluster:
+				resource = respResource.GetKubeCluster()
+			case types.KindKubeServer:
+				resource = respResource.GetKubernetesServer()
+			default:
+				return nil, 0, trace.NotImplemented("resource type %s does not support pagination", req.ResourceType)
+			}
+
+			t, ok := resource.(T)
+			if !ok {
+				return nil, 0, trace.BadParameter("received unexpected resource type %T", resource)
+			}
+			out = append(out, t)
+		}
+
+		return out, int(resp.TotalCount), nil
+	}
+}
+
+// GetAllResources is a helper for getting all existing resources that match the provided request.In addition to
+// iterating pages, it also correctly handles downsizing pages when LimitExceeded errors are encountered.
+func GetAllResources[T types.ResourceWithLabels](ctx context.Context, clt GetResourcesClient, req *proto.ListResourcesRequest) ([]T, error) {
+	var (
+		out []T
+	)
+
+	// Set the limit to the default size.
+	req.Limit = int32(defaults.DefaultChunkSize)
+	for {
+		page, _, err := GetResourcePage[T](ctx, clt, req)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+
+		out = append(out, page...)
+
+		if req.StartKey == "" || len(page) == 0 {
+			break
+		}
+	}
+
+	return out, nil
 }
 
 // ListResourcesClient is an interface used by GetResourcesWithFilters to abstract over implementations of
