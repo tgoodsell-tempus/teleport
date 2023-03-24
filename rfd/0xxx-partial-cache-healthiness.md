@@ -317,3 +317,6 @@ func (c *Cache) GetApps(ctx context.Context) ([]types.Application, error) {
    return rg.getter.GetApps(ctx)
 }
 ```
+
+This seems like a nicer solution, but involving a lot of code changes, so the final implementation might fall back
+to the first option `(*Cache).read(kind types.WatchKind)`.
