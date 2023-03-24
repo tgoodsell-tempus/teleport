@@ -125,13 +125,21 @@ export function ActionPicker() {
       onBack={close}
       render={item => {
         const Component = ComponentMap[item.searchResult.kind];
-        return (
-          <Component
-            searchResult={item.searchResult}
-            getClusterName={getClusterName}
-          />
-        );
+        return {
+          key: item.searchResult.resource.uri,
+          Component: (
+            <Component
+              searchResult={item.searchResult}
+              getClusterName={getClusterName}
+            />
+          ),
+        };
       }}
+      NoResultsComponent={
+        <EmptyListCopy>
+          <Text>No matching results found.</Text>
+        </EmptyListCopy>
+      }
     />
   );
 }

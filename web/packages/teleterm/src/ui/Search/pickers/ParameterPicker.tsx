@@ -39,8 +39,10 @@ export function ParameterPicker(props: ParameterPickerProps) {
   }, [props.action]);
 
   const attempt = mapAttempt(suggestionsAttempt, suggestions =>
-    suggestions.filter(v =>
-      v.toLocaleLowerCase().includes(inputValue.toLocaleLowerCase())
+    suggestions.filter(
+      v =>
+        v.toLocaleLowerCase().includes(inputValue.toLocaleLowerCase()) &&
+        v !== inputValue
     )
   );
 
@@ -67,9 +69,10 @@ export function ParameterPicker(props: ParameterPickerProps) {
       extraItems={extraItems}
       onPick={onPick}
       onBack={onBack}
-      render={item => (
-        <Highlight text={item} keywords={[inputValue]}></Highlight>
-      )}
+      render={item => ({
+        key: item,
+        Component: <Highlight text={item} keywords={[inputValue]}></Highlight>,
+      })}
     />
   );
 }

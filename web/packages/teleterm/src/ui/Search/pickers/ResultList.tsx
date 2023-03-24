@@ -24,7 +24,7 @@ import React, {
 import styled from 'styled-components';
 
 import { Attempt } from 'shared/hooks/useAsync';
-import { Box, Text } from 'design';
+import { Box } from 'design';
 
 import LinearProgress from 'teleterm/ui/components/LinearProgress';
 
@@ -34,15 +34,30 @@ type ResultListProps<T> = {
    * extraItems is an array of extra results that get render irrelevant of the attempt status.
    */
   extraItems?: T[];
+  /**
+   * NoResultsComponent is the element that's going to be rendered instead of the list if the
+   * attempt has successfully finished but there's no results to show.
+   */
+  NoResultsComponent?: ReactElement;
   onPick(item: T): void;
   onBack(): void;
-  render(item: T): ReactElement;
+  render(item: T): { Component: ReactElement; key: string };
 };
 
 export function ResultList<T>(props: ResultListProps<T>) {
-  const { attempt, extraItems = [], onPick, onBack } = props;
+  const {
+    attempt,
+    extraItems = [],
+    NoResultsComponent,
+    onPick,
+    onBack,
+  } = props;
   const activeItemRef = useRef<HTMLDivElement>();
   const [activeItemIndex, setActiveItemIndex] = useState(0);
+  const shouldShowNoResultsCopy =
+    NoResultsComponent &&
+    attempt.status === 'success' &&
+    attempt.data.length === 0;
 
   const items = useMemo(
     () =>
@@ -51,6 +66,13 @@ export function ResultList<T>(props: ResultListProps<T>) {
         : extraItems,
     [attempt.status, attempt.data, extraItems]
   );
+
+  // Reset the active item index if it's greater than the number of available items.
+  // This can happen in cases where the user selects the nth item and then filters the list so that
+  // there's only one item.
+  if (activeItemIndex !== 0 && activeItemIndex >= items.length) {
+    setActiveItemIndex(0);
+  }
 
   useEffect(() => {
     const handleArrowKey = (e: KeyboardEvent, nudge: number) => {
@@ -112,24 +134,20 @@ export function ResultList<T>(props: ResultListProps<T>) {
       )}
       {items.map((r, index) => {
         const isActive = index === activeItemIndex;
+        const { Component, key } = props.render(r);
 
         return (
           <StyledItem
             ref={isActive ? activeItemRef : null}
             $active={isActive}
-            // TODO: Provide a real key instead of using index.
-            key={`${index}`}
+            key={key}
             onClick={() => props.onPick(r)}
           >
-            {props.render(r)}
+            {Component}
           </StyledItem>
         );
       })}
-      {attempt.status === 'success' && attempt.data.length === 0 && (
-        <EmptyListCopy>
-          <Text>No matching results found.</Text>
-        </EmptyListCopy>
-      )}
+      {shouldShowNoResultsCopy && NoResultsComponent}
     </>
   );
 }
