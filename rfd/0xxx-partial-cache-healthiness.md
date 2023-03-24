@@ -132,7 +132,7 @@ type Watch struct {
 	// *NEW* PreviouslyRejectedKinds contains a list of kinds rejected by upstream implementations in a chain of NewWatcher()
 	// calls. Must be empty if AllowRejectedKinds is not set. A kind cannot be on both Kinds and PreviouslyRejectedKinds
 	// at the same time.
-	PreviouslyRejectedKinds []RejectedKind
+	PreviouslyRejectedKinds []WatchKind
 }
 ```
 
@@ -143,18 +143,6 @@ it won't set this flag. In that case it should get an error if one of the kinds 
 `PreviouslyRejectedKinds` should be added to accommodate wrapper implementations of `Events` which perform validations
 and call the inner implementation. If `AllowRejectedKinds` is set and the wrapper determines that some of the requested
 kinds cannot be watched, they will be moved from Kinds to this new field and passed to the inner implementation this way.
-
-```protobuf
-message RejectedKind {
-  // Kind is the resource kind.
-  string Kind = 1;
-  // SubKind is an optional resource subkind.
-  string SubKind = 2;
-  // Reason is used for debugging purposes.
-  string Reason = 3;
-}
-```
-
 
 #### types.WatchStatus
 
@@ -172,7 +160,7 @@ message WatchStatusV1 {
 }
 
 message WatchStatusSpecV1 {
-  repeated RejectedKind RejectedKinds = 1;
+  repeated WatchKind RejectedKinds = 1;
 }
 ```
 
