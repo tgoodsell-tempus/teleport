@@ -30,7 +30,7 @@ import { mapToActions, SearchAction } from '../actions';
 import { useSearchContext } from '../SearchContext';
 
 import { getParameterPicker } from './pickers';
-import { ResultList } from './ResultList';
+import { ResultList, EmptyListCopy } from './ResultList';
 
 export function ActionPicker() {
   const searchLogger = useRef(new Logger('search'));
@@ -84,7 +84,22 @@ export function ActionPicker() {
   );
 
   if (!inputValue) {
-    return <div>Search for something</div>;
+    return (
+      <EmptyListCopy>
+        <Text>
+          <ul>
+            <li>Separate the search terms with space.</li>
+            <li>
+              Resources that match the query the most will appear at the top.
+            </li>
+            <li>
+              Selecting a search result will connect to the resource in a new
+              tab.
+            </li>
+          </ul>
+        </Text>
+      </EmptyListCopy>
+    );
   }
 
   return (

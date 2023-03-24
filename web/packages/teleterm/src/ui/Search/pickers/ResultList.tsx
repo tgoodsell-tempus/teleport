@@ -24,6 +24,7 @@ import React, {
 import styled from 'styled-components';
 
 import { Attempt } from 'shared/hooks/useAsync';
+import { Box, Text } from 'design';
 
 import LinearProgress from 'teleterm/ui/components/LinearProgress';
 
@@ -124,6 +125,11 @@ export function ResultList<T>(props: ResultListProps<T>) {
           </StyledItem>
         );
       })}
+      {attempt.status === 'success' && attempt.data.length === 0 && (
+        <EmptyListCopy>
+          <Text>No matching results found.</Text>
+        </EmptyListCopy>
+      )}
     </>
   );
 }
@@ -140,13 +146,24 @@ const StyledItem = styled.div(({ theme, $active }) => {
     },
 
     borderBottom: `2px solid ${theme.colors.primary.main}`,
-    padding: `${theme.space[1]}px ${theme.space[2]}px`,
+    padding: `${theme.space[2]}px`,
     color: theme.colors.primary.contrastText,
     background: $active
       ? theme.colors.primary.lighter
       : theme.colors.primary.light,
   };
 });
+
+export const EmptyListCopy = styled(Box)`
+  width: 100%;
+  height: 100%;
+  padding: ${props => props.theme.space[2]}px;
+  line-height: 1.5em;
+  ul {
+    margin: 0;
+    padding-inline-start: 2em;
+  }
+`;
 
 function getNext(selectedIndex = 0, max = 0) {
   let index = selectedIndex % max;
