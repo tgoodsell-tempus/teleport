@@ -97,7 +97,7 @@ const ResourceTypeOption = styled.div`
 
 const Tag = styled.div`
   align-items: center;
-  background-color: #512fc9;
+  background-color: ${({ theme }) => theme.colors.brand.main};
   border-radius: 33px;
   box-sizing: border-box;
   font-size: 10px;
