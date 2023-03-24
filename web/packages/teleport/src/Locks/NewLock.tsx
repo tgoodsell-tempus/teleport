@@ -113,6 +113,7 @@ export function NewLockContent({
             value={selectedTargetType}
             options={lockTargets}
             onChange={(o: LockTarget) => setSelectedTargetType(o)}
+            label="lock-target-type"
           />
         </Box>
         <QuickAdd targetType={selectedTargetType.label} onAdd={onAdd} />
@@ -229,7 +230,9 @@ const BtnCell = ({
 }) => {
   return (
     <Cell align="right">
-      <ButtonPrimary onClick={cb}>{children}</ButtonPrimary>
+      <ButtonPrimary onClick={cb} data-testid="btn-cell">
+        {children}
+      </ButtonPrimary>
     </Cell>
   );
 };
