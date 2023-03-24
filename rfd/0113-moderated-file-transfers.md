@@ -18,15 +18,21 @@ Approval process to allow file transfers during a web moderated session
 
 ## Why
 
-Users have no ability to transfer files if their role requires a moderated session for the specified server, even if they are in an active and "valid" session currently. Originally, we would allow file transfers regardless of moderated sessions which, while good for UX, goes against the purpose of moderated sessions in the first place. We have disabled the functionality but would like to reintroduce it in a secure, moderated, and auditable way. 
+Users have no ability to transfer files if their role requires a moderated session for the specified server, even if they are in an active and "valid" session currently.
+Originally, we would allow file transfers regardless of moderated sessions which, while good for UX, goes against the purpose of moderated sessions in the first place. 
+We have disabled the functionality but would like to reintroduce it in a secure, moderated, and auditable way. 
 
 ## Scope
 
-This RFD will cover how to implement for web SCP specifically, but may be expanded to SFTP for tsh, although my research has been mostly for web scp. If at anytime there is ambiguity in this RFD for "which type of file transfers does this refer to", default to web scp only. 
+This RFD will cover how to implement for web SCP specifically, but may be expanded to SFTP for tsh, although my research has been mostly for web scp. 
+If at anytime there is ambiguity in this RFD for "which type of file transfers does this refer to", default to web scp only. 
 
 ## The current issue
 
-When a user initiates a file transfer request (HTTP request and `tcp scp`), the system establishes a new non-interactive session to run the "exec" command. When we attempt to [open the session](https://github.com/gravitational/teleport/blob/64b10f1ccbeeab63c4ce91f5f11fdd74b42448d8/lib/srv/sess.go#L277) we have a check named `checkIfStart` which will pull any policies that require moderation from the current identity, and return if they've been fulfilled or not. This will always fail as this is a "new" session, created just a few lines before the check itself. Therefore, we need a way to let the server know that this request has been moderator approved.
+When a user initiates a file transfer request (HTTP request and `tcp scp`), the system establishes a new non-interactive session to run the "exec" command.
+When we attempt to [open the session](https://github.com/gravitational/teleport/blob/64b10f1ccbeeab63c4ce91f5f11fdd74b42448d8/lib/srv/sess.go#L277) we have a check named `checkIfStart` which will pull any policies that require moderation from the current identity, and return if they've been fulfilled or not. 
+This will always fail as this is a "new" session, created just a few lines before the check itself. 
+Therefore, we need a way to let the server know that this request has been moderator approved.
 
 ## Details
 
@@ -43,7 +49,8 @@ Requester->>API Server: http request with sessionID and requestID appended to ur
 
 ### The FileTransferRequest 
 
-The general idea of the solution is to provide a way for users to "request-a-request" that can be approved by moderators. An example of a file transfer specific struct could look like
+The general idea of the solution is to provide a way for users to "request-a-request" that can be approved by moderators. 
+An example of a file transfer specific struct could look like
 
 ```go
 type FileTransferRequest {
@@ -56,7 +63,8 @@ type FileTransferRequest {
 }
 ```
 
-We can add any relevant information otherwise needed. File-size was considered, but imagine a user trying to download a log file that could have changed size by the time the request flow has completed. 
+We can add any relevant information otherwise needed. 
+File-size was considered, but imagine a user trying to download a log file that could have changed size by the time the request flow has completed. 
 
 Because this struct is going to allow an exec command to go through, we could abstract it further to _any_ SSHRequest being passed instead with a struct like below
 
@@ -81,12 +89,14 @@ type session struct {
 }
 ```
 
-The benefit of storing it on the session, and not in an access-request-like object, is that once the session is gone, so is the approved request. Keeping these approvals as ephemeral as possible is ideal. 
+The benefit of storing it on the session, and not in an access-request-like object, is that once the session is gone, so is the approved request. 
+Keeping these approvals as ephemeral as possible is ideal. 
 
 ### the fileTransferChannel 
 
 "How do we we send a FileTransferRequest anyway?". 
-We will add a new channel and event in `web/terminal.go` named `fileTransferC` Similar to `resizeC`, we can send an event+payload envelope with the current websocket implementation. The client will implement a new  `MessageTypeEnum` that can be matched in the backend. "t" for transfer!
+We will add a new channel and event in `web/terminal.go` named `fileTransferC` Similar to `resizeC`, we can send an event+payload envelope with the current websocket implementation. 
+The client will implement a new  `MessageTypeEnum` that can be matched in the backend. "t" for transfer!
 
 ```diff
 export const MessageTypeEnum = {
@@ -110,9 +120,12 @@ export const MessageTypeEnum = {
 	2. store the request in the session
 	3. Notify all members of the party (besides originator) of the request via the session connection. 
 
-The reason we notify _all_ party members (originator excluded) is that a session might not necessarily require a moderator but just a second-party such as a peer. This would allow those types of sessions to still be audited and go through the file request approval process.
+The reason we notify _all_ party members (originator excluded) is that a session might not necessarily require a moderator but just a second-party such as a peer. 
+This would allow those types of sessions to still be audited and go through the file request approval process.
 
-After the steps above we are in the `PENDING` state. This isn't a real "state" that exists in any struct, just the part of the flow that is waiting for responses. This is not a blocking state and essentially just creates the request, and updates the relevant UI (more on the UI below). 
+After the steps above we are in the `PENDING` state. 
+This isn't a real "state" that exists in any struct, just the part of the flow that is waiting for responses. 
+This is not a blocking state and essentially just creates the request, and updates the relevant UI (more on the UI below). 
 
 ### The Approval process
 
@@ -129,7 +142,8 @@ OnApprove:
 	2. Broadcast/audit event
 	3. We can then use a policy checker to see if the approvers fulfill any moderation policy on the original requester. We can treat this check the same as the `checkIfStart` conditional for opening a session. If this comes back true, we notify the original requester with an event containing the ID of the `FileTransferRequest`
 
-Once the client receives this final "approved" message, we can automatically send a "normal" SCP request (over HTTP) with two new optional params, `sessionID` and `requestID` (similar to the new optional `webauthn` param in this same request). The benefits of using the normal SCP request is that we can conditionally choose to skip this entire approval process flow for non-moderated sessions. If the session is not moderated, just send the scp request as usual. If it is, do the song and dance perscribed above.
+Once the client receives this final "approved" message, we can automatically send a "normal" SCP request (over HTTP) with two new optional params, `sessionID` and `requestID` (similar to the new optional `webauthn` param in this same request). The benefits of using the normal SCP request is that we can conditionally choose to skip this entire approval process flow for non-moderated sessions. 
+If the session is not moderated, just send the scp request as usual. If it is, do the song and dance perscribed above.
 
 ### Updated file transfer api handler
 
