@@ -28,9 +28,20 @@ This RFD will cover how to implement for web SCP specifically, but may be expand
 
 When a user initiates a file transfer request (HTTP request and `tcp scp`), the system establishes a new non-interactive session to run the "exec" command. When we attempt to [open the session](https://github.com/gravitational/teleport/blob/64b10f1ccbeeab63c4ce91f5f11fdd74b42448d8/lib/srv/sess.go#L277) we have a check named `checkIfStart` which will pull any policies that require moderation from the current identity, and return if they've been fulfilled or not. This will always fail as this is a "new" session, created just a few lines before the check itself. Therefore, we need a way to let the server know that this request has been moderator approved.
 
-### Details
+## Details
 
-#### The FileTransferRequest 
+The proposed flow would look like this (simplified).
+```mermaid
+sequenceDiagram
+Requester->>SSH Server: Send FileTransferRequest over websocket connection
+SSH Server->>Approvers: Create, store, and emit FileTransferRequest to participants
+Approvers->>SSH Server: Approve/Deny request
+Note over SSH Server,Approvers: Check to see if policy has been fulfilled by approval.<br />If not, wait for more responses.
+SSH Server->>Requester: Receive notification once approved with requestID
+Requester->>API Server: http request with sessionID and requestID appended to url params
+```
+
+### The FileTransferRequest 
 
 The general idea of the solution is to provide a way for users to "request-a-request" that can be approved by moderators. An example of a file transfer specific struct could look like
 
@@ -72,7 +83,7 @@ type session struct {
 
 The benefit of storing it on the session, and not in an access-request-like object, is that once the session is gone, so is the approved request. Keeping these approvals as ephemeral as possible is ideal. 
 
-#### the fileTransferChannel 
+### the fileTransferChannel 
 
 "How do we we send a FileTransferRequest anyway?". 
 We will add a new channel and event in `web/terminal.go` named `fileTransferC` Similar to `resizeC`, we can send an event+payload envelope with the current websocket implementation. The client will implement a new  `MessageTypeEnum` that can be matched in the backend. "t" for transfer!
@@ -103,7 +114,7 @@ The reason we notify _all_ party members (originator excluded) is that a session
 
 After the steps above we are in the `PENDING` state. This isn't a real "state" that exists in any struct, just the part of the flow that is waiting for responses. This is not a blocking state and essentially just creates the request, and updates the relevant UI (more on the UI below). 
 
-#### The Approval process
+### The Approval process
 
 Similar to sending the `FileTransferRequest` event, another event will be listened to, the `FileTranferRequestResponse` (working name). We could separate this new event into two with Approve/Deny but a simple switch case on a field should suffice. 
 
@@ -120,7 +131,7 @@ OnApprove:
 
 Once the client receives this final "approved" message, we can automatically send a "normal" SCP request (over HTTP) with two new optional params, `sessionID` and `requestID` (similar to the new optional `webauthn` param in this same request). The benefits of using the normal SCP request is that we can conditionally choose to skip this entire approval process flow for non-moderated sessions. If the session is not moderated, just send the scp request as usual. If it is, do the song and dance perscribed above.
 
-#### Updated file transfer api handler
+### Updated file transfer api handler
 
 Not much will change here. The only difference is adding the `requestID` and `sessionID` as env vars in the `serverContext`. This will allow us to extend our `SessionRegistry.OpenExecSession` method with a new check like `isApprovedRequest`
 
@@ -149,7 +160,7 @@ func (s *SessionRegistry) OpenExecSession(ctx context.Context, channel ssh.Chann
 }
 ```
 
-#### UX/UI
+### UX/UI
 
 The request-a-request flow would be: the request -> the approval -> the file transfer
 
@@ -163,14 +174,14 @@ A user will follow the normal file transfer dialog and, if in a moderated sessio
 
 If a request is approved, the user view will continue to look/function the same way as a regular request currently. 
 
-#### Per-session-MFA
+### Per-session-MFA
 
 Once a file has been approved, it will go through the same process as file transfers now, so the "requester" gets all the MFA functionality for free and nothing will need to be done on that side.
 
 We will have to add an MFA tap for approve/deny if MFA is required, but our sessions already have precence checks that require MFA so we can just reuse what already exists here.
 
 
-### Security Considerations
+## Security Considerations
 Originally, an idea was thrown around to create a "signed" url with all the `FileTransferRequest` information encoded in it but this seemed unnecessary. Because the current flow stores the original request in the session, we aren't giving them full access to open any exec session, just one that matches the exact request that was asked for. Also, having the request stored in the session means that once the session is gone, there isn't a way to "re-request" it. 
 
 I didn't speak above removing the request once it's been completed but that is a possibility. We can either
