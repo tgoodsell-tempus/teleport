@@ -54,7 +54,8 @@ Requester->>Proxy: http request with sessionID and commandRequestID appended to 
 The general idea of the solution is to provide a way for users to "request-a-request" that can be approved by moderators. 
 When a request is made via the web UI, the ui will determine if the request will require an approval process. 
 Only moderated sessions will require this process. If the launched session is not a moderated session, we can pass a file transfer request as normal. 
-The UI currently doesn't have an explicit flag stating if it is in a moderated session or not, so we will have to pass this value back to the UI with the rest of the [SessionMetadata](https://github.com/gravitational/teleport/blob/master/web/packages/teleport/src/services/session/types.ts#L44) on session init
+The UI currently doesn't have an explicit flag stating if it is in a moderated session or not, so we will have to pass this value back to the UI with the rest of the [SessionMetadata](https://github.com/gravitational/teleport/blob/master/web/packages/teleport/src/services/session/types.ts#L44) on session init.
+Once the approval process is completed, the file transfer will be sent with our new extra parameters. More details [below](#updated-file-transfer-api-handler)
 
 ```go
 type FileTransferRequest {
