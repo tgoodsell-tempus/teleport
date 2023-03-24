@@ -1,7 +1,6 @@
-
 ---
-authors: Michael Myers (michael.myers@goteleport.com)
-state: draft
+author: Michael Myers (michael.myers@goteleport.com)
+state: discussion
 ---
 
 # RFD 113 - Web Moderated Session File Transfer
