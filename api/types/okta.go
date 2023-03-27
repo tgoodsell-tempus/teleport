@@ -19,6 +19,7 @@ package types
 import (
 	"fmt"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/gravitational/trace"
 
 	"github.com/gravitational/teleport/api/constants"
@@ -179,6 +180,8 @@ type OktaAssignment interface {
 	GetUser() string
 	// GetActions will return the list of actions that will be performed as part of this assignment.
 	GetActions() []OktaAssignmentAction
+	// Copy returns a copy of this Okta assignment resource.
+	Copy() OktaAssignment
 }
 
 // NewOktaAssignment creates a new Okta assignment object.
@@ -200,6 +203,7 @@ func (o *OktaAssignmentV1) GetUser() string {
 	return o.Spec.User
 }
 
+// GetActions returns the actions associated with the Okta assignment.
 func (o *OktaAssignmentV1) GetActions() []OktaAssignmentAction {
 	actions := make([]OktaAssignmentAction, len(o.Spec.Actions))
 
@@ -208,6 +212,11 @@ func (o *OktaAssignmentV1) GetActions() []OktaAssignmentAction {
 	}
 
 	return actions
+}
+
+// Copy returns a copy of this Okta assignment resource.
+func (o *OktaAssignmentV1) Copy() OktaAssignment {
+	return proto.Clone(o).(*OktaAssignmentV1)
 }
 
 // String returns the Okta assignment rule string representation.
@@ -291,3 +300,23 @@ func (o *OktaAssignmentActionV1) GetTargetType() string {
 func (o *OktaAssignmentActionV1) GetID() string {
 	return o.Target.Id
 }
+
+// Assignments is a list of Okta assignment resources.
+type OktaAssignments []OktaAssignment
+
+// AsResources returns these Okta assignments as resources with labels.
+func (o OktaAssignments) AsResources() (resources ResourcesWithLabels) {
+	for _, assignment := range o {
+		resources = append(resources, assignment)
+	}
+	return resources
+}
+
+// Len returns the slice length.
+func (o OktaAssignments) Len() int { return len(o) }
+
+// Less compares Okta assignments by name.
+func (o OktaAssignments) Less(i, j int) bool { return o[i].GetName() < o[j].GetName() }
+
+// Swap swaps two Okta assignments.
+func (o OktaAssignments) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
