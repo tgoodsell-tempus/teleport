@@ -899,7 +899,7 @@ func (c *connectionWrapper) Read(b []byte) (int, error) {
 func getTCPAddr(addr string) (*net.TCPAddr, error) {
 	ap, err := netip.ParseAddrPort(addr)
 	if err != nil {
-		return nil, err
+		return nil, trace.Wrap(err)
 	}
 	return net.TCPAddrFromAddrPort(ap), nil
 }
