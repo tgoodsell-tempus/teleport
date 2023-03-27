@@ -41,7 +41,7 @@ type GenerateDatabaseCertificatesRequest struct {
 	IdentityFileWriter identityfile.ConfigWriter
 	TTL                time.Duration
 	Key                *client.Key
-	// KeyStore is used to generate JKS keystore used for cassandra format or Oracle wallet.
+	// Password is used to generate JKS keystore used for cassandra format or Oracle wallet.
 	Password string
 }
 

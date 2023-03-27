@@ -34,7 +34,7 @@ type jdbcSettings struct {
 	TrustStorePassword string
 }
 
-var jdbcPropertiesTemplateContent = `
+const jdbcPropertiesTemplateContent = `
 javax.net.ssl.keyStore={{.KeyStoreFile}}
 javax.net.ssl.trustStore={{.TrustStoreFile}}
 javax.net.ssl.keyStorePassword={{.KeyStorePassword}}
@@ -50,7 +50,7 @@ type tnsNamesORASettings struct {
 	Port        string
 }
 
-var sqlnetORATemplateContent = `
+const sqlnetORATemplateContent = `
 SSL_CLIENT_AUTHENTICATION = TRUE
 SQLNET.AUTHENTICATION_SERVICES = (TCPS)
 
@@ -67,7 +67,7 @@ type sqlnetORASettings struct {
 	WalletDir string
 }
 
-var tnsnamesORATemplateContent = `
+const tnsnamesORATemplateContent = `
 {{.ServiceName}} =
   (DESCRIPTION =
     (ADDRESS_LIST =

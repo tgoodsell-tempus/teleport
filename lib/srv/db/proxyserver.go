@@ -49,6 +49,7 @@ import (
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/srv"
 	"github.com/gravitational/teleport/lib/srv/db/common"
+	"github.com/gravitational/teleport/lib/srv/db/common/enterprise"
 	"github.com/gravitational/teleport/lib/srv/db/dbutils"
 	"github.com/gravitational/teleport/lib/srv/db/mysql"
 	"github.com/gravitational/teleport/lib/srv/db/postgres"
@@ -343,7 +344,7 @@ func (s *ProxyServer) handleConnection(conn net.Conn) error {
 		s.cfg.IngressReporter.ConnectionAuthenticated(ingress.DatabaseTLS, conn)
 		defer s.cfg.IngressReporter.AuthenticatedConnectionClosed(ingress.DatabaseTLS, conn)
 	}
-	if common.EnterpriseDBProtocolValidation(proxyCtx.Identity.RouteToDatabase.Protocol); err != nil {
+	if enterprise.ProtocolValidation(proxyCtx.Identity.RouteToDatabase.Protocol); err != nil {
 		return trace.Wrap(err)
 	}
 

@@ -316,7 +316,7 @@ func checkAndSetDBRouteDefaults(r *tlsca.RouteToDatabase) error {
 		switch r.Protocol {
 		// Always require db-name for Oracle Protocol.
 		case defaults.ProtocolOracle:
-			return trace.BadParameter("please provide the database name using the --db-user flag")
+			return trace.BadParameter("please provide the database name using the --db-name flag")
 		}
 	}
 	return nil

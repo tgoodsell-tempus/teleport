@@ -640,11 +640,16 @@ func (c *CLICommandBuilder) getOracleCommand() (*exec.Cmd, error) {
 		host:     c.host,
 		port:     c.port,
 		db:       c.db.Database,
-		tnsAdmin: c.profile.OracleWalletDir(c.rootCluster, c.db.ServiceName),
+		tnsAdmin: c.profile.OracleWalletDir(c.profile.Cluster, c.db.ServiceName),
+	}
+	// Quote the address for printing as the address contains "?".
+	connString := cs.ConnString()
+	if c.options.printFormat {
+		connString = fmt.Sprintf(`'%s'`, connString)
 	}
 	args := []string{
 		"-L", // dont retry
-		cs.ConnString(),
+		connString,
 	}
 	return c.options.exe.Command(oracleBin, args...), nil
 }

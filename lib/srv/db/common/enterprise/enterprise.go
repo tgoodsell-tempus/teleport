@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package enterprise
 
 import (
 	"github.com/gravitational/trace"
@@ -23,8 +23,8 @@ import (
 	"github.com/gravitational/teleport/lib/modules"
 )
 
-// EnterpriseDBProtocolValidation checks if protocol is supported for current build.
-func EnterpriseDBProtocolValidation(dbProtocol string) error {
+// ProtocolValidation checks if protocol is supported for current build.
+func ProtocolValidation(dbProtocol string) error {
 	switch dbProtocol {
 	case defaults.ProtocolOracle:
 		if modules.GetModules().BuildType() != modules.BuildEnterprise {

@@ -103,6 +103,10 @@ const (
 	// DefaultFormat is what Teleport uses by default
 	DefaultFormat = FormatFile
 
+	// FormatOracle produces CA and ke pair in the Oracle wallet format.
+	// The execution depend on Orapki binary and if this binary is not found
+	// Teleport will print intermediate steps how to convert Teleport certs
+	// to Oracle wallet on Oracle Server instance.
 	FormatOracle Format = "oracle"
 )
 
@@ -487,7 +491,7 @@ func writeOracleFormat(cfg WriteConfig, writer ConfigWriter) ([]string, error) {
 	p12Path := cfg.OutputPath + ".p12"
 	certPath := cfg.OutputPath + ".crt"
 
-	if err := os.WriteFile(p12Path, pf, identityfile.FilePermissions); err != nil {
+	if err := writer.WriteFile(p12Path, pf, identityfile.FilePermissions); err != nil {
 		return nil, trace.Wrap(err)
 	}
 	err = writer.WriteFile(certPath, cfg.Key.TLSCert, identityfile.FilePermissions)
@@ -536,7 +540,7 @@ func createOracleWallet(walletPath, p12Path, certPath, password string) error {
 		"-auto_login_only",
 	}
 	cmd := exec.Command(orapkiBinary, args...)
-	if output, err := cmd.Output(); err != nil {
+	if output, err := cmd.CombinedOutput(); err != nil {
 		return trace.Wrap(err, fmt.Sprintf(errDetailsFormat, cmd.String(), output))
 	}
 
@@ -548,7 +552,7 @@ func createOracleWallet(walletPath, p12Path, certPath, password string) error {
 		"-pkcs12pwd", password,
 	}
 	cmd = exec.Command(orapkiBinary, args...)
-	if output, err := exec.Command(orapkiBinary, args...).Output(); err != nil {
+	if output, err := exec.Command(orapkiBinary, args...).CombinedOutput(); err != nil {
 		return trace.Wrap(err, fmt.Sprintf(errDetailsFormat, cmd.String(), output))
 	}
 
@@ -560,7 +564,7 @@ func createOracleWallet(walletPath, p12Path, certPath, password string) error {
 		"-cert", certPath,
 	}
 	cmd = exec.Command(orapkiBinary, args...)
-	if output, err := exec.Command(orapkiBinary, args...).Output(); err != nil {
+	if output, err := exec.Command(orapkiBinary, args...).CombinedOutput(); err != nil {
 		return trace.Wrap(err, fmt.Sprintf(errDetailsFormat, cmd.String(), output))
 	}
 	return nil

@@ -38,7 +38,7 @@ import (
 // tnsnames.ora - Oracle Net Service mapped to connections descriptors.
 func GenerateClientConfiguration(key *client.Key, db tlsca.RouteToDatabase, profile *client.ProfileStatus) error {
 	walletPath := profile.OracleWalletDir(key.ClusterName, db.ServiceName)
-	if err := os.MkdirAll(walletPath, 0700); err != nil {
+	if err := utils.MkdirAll(walletPath, teleport.PrivateDirMode); err != nil {
 		return trace.Wrap(err)
 	}
 	password, err := utils.CryptoRandomHex(32)
