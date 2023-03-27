@@ -46,7 +46,7 @@ export function Locks() {
   const { locks, fetchLocks } = useLocks(clusterId);
 
   function onDelete(lockName: string) {
-    api.delete(cfg.getLocksUrlWithUUID(clusterId, lockName)).then(() => {
+    api.delete(cfg.getLocksUrlWithUuid(clusterId, lockName)).then(() => {
       // It takes longer for the cache to be updated when removing locks so
       // this waits 1s before fetching the list again.
       setTimeout(() => {

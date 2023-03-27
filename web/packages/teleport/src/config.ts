@@ -196,7 +196,7 @@ const cfg = {
     mfaDevicePath: '/v1/webapi/mfa/token/:tokenId/devices/:deviceName',
 
     locksPath: '/v1/webapi/sites/:clusterId/locks',
-    locksPathWithUUID: '/v1/webapi/sites/:clusterId/locks/:uuid',
+    locksPathWithUuid: '/v1/webapi/sites/:clusterId/locks/:uuid',
 
     dbSign: 'v1/webapi/sites/:clusterId/sign/db',
 
@@ -509,8 +509,8 @@ const cfg = {
     return generatePath(cfg.api.locksPath, { clusterId });
   },
 
-  getLocksUrlWithUUID(clusterId: string, uuid: string) {
-    return generatePath(cfg.api.locksPathWithUUID, { clusterId, uuid });
+  getLocksUrlWithUuid(clusterId: string, uuid: string) {
+    return generatePath(cfg.api.locksPathWithUuid, { clusterId, uuid });
   },
 
   getDatabaseSignUrl(clusterId: string) {
