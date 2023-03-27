@@ -143,14 +143,10 @@ export function MoreOptions() {
 
   const items = useMenuItems().map(item => {
     return (
-      <>
-        {item.prependSeparator && <Separator key={'separator' + item.title} />}
-        <MenuItem
-          key={item.title}
-          item={item}
-          closeMenu={() => setIsPopoverOpened(false)}
-        />
-      </>
+      <React.Fragment key={item.title}>
+        {item.prependSeparator && <Separator />}
+        <MenuItem item={item} closeMenu={() => setIsPopoverOpened(false)} />
+      </React.Fragment>
     );
   });
 
