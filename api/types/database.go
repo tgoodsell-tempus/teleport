@@ -884,7 +884,7 @@ func (d *DatabaseTLSMode) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return trace.Wrap(err)
 	}
-	return d.decode_name(s)
+	return d.decodeName(s)
 }
 
 // MarshalYAML marshals DatabaseTLSMode to string.
@@ -911,13 +911,14 @@ func (d *DatabaseTLSMode) UnmarshalYAML(unmarshal func(interface{}) error) error
 	if err := unmarshal(&s); err != nil {
 		return trace.Wrap(err)
 	}
-	return d.decode_name(s)
+	return d.decodeName(s)
 }
 
-// decode DatabaseTLSMode from a string. This is necessary for allowing tctl
-// commands to work with the same names as documented in Teleport configuration,
-// rather than requiring it be specified as an unreadable enum number.
-func (d *DatabaseTLSMode) decode_name(name string) error {
+// decodeName decodes DatabaseTLSMode from a string. This is necessary for
+// allowing tctl commands to work with the same names as documented in Teleport
+// configuration, rather than requiring it be specified as an unreadable enum
+// number.
+func (d *DatabaseTLSMode) decodeName(name string) error {
 	switch name {
 	case "verify-full", "":
 		*d = DatabaseTLSMode_VERIFY_FULL
