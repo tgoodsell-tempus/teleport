@@ -2376,7 +2376,7 @@ func (h *Handler) getClusterLocks(
 	sessionCtx *SessionContext,
 	site reversetunnel.RemoteSite) (interface{}, error) {
 	ctx := r.Context()
-	clt, err := sessionCtx.GetUserClient(r.Context(), site)
+	clt, err := sessionCtx.GetUserClient(ctx, site)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -2389,24 +2389,23 @@ func (h *Handler) getClusterLocks(
 	// Table component doesn't support nested complex objects. And fails to properly
 	// sort or filter results.
 	lockList := make([]UILock, 0, len(locks))
-	for i := 0; i < len(locks); i++ {
-		expires := ""
-		createdAt := ""
-		if locks[i].LockExpiry() != nil {
-			expires = locks[i].LockExpiry().Format(time.RFC3339Nano)
+	for _, lock := range locks {
+		var expires, createdAt string
+		if lock.LockExpiry() != nil {
+			expires = lock.LockExpiry().Format(time.RFC3339Nano)
 		}
 
-		if !locks[i].CreatedAt().IsZero() {
-			createdAt = locks[i].CreatedAt().Format(time.RFC3339Nano)
+		if !lock.CreatedAt().IsZero() {
+			createdAt = lock.CreatedAt().Format(time.RFC3339Nano)
 		}
 
 		lockList = append(lockList, UILock{
-			Name:      locks[i].GetMetadata().Name,
-			Message:   locks[i].Message(),
+			Name:      lock.GetMetadata().Name,
+			Message:   lock.Message(),
 			Expires:   expires,
-			Targets:   locks[i].Target(),
+			Targets:   lock.Target(),
 			CreatedAt: createdAt,
-			CreatedBy: locks[i].CreatedBy(),
+			CreatedBy: lock.CreatedBy(),
 		})
 	}
 	return lockList, nil
@@ -2425,13 +2424,12 @@ func (h *Handler) createClusterLock(
 	sessionCtx *SessionContext,
 	site reversetunnel.RemoteSite) (interface{}, error) {
 	var req *createLockReq
-
 	if err := httplib.ReadJSON(r, &req); err != nil {
 		return nil, trace.Wrap(err)
 	}
 
 	ctx := r.Context()
-	clt, err := sessionCtx.GetUserClient(r.Context(), site)
+	clt, err := sessionCtx.GetUserClient(ctx, site)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -2443,16 +2441,16 @@ func (h *Handler) createClusterLock(
 		}
 	}
 
-	var ttl *time.Time
+	var expires *time.Time
 	if ttlDuration != 0 {
 		t := time.Now().UTC().Add(ttlDuration)
-		ttl = &t
+		expires = &t
 	}
 
 	lock, err := types.NewLock(uuid.New().String(), types.LockSpecV2{
 		Target:  req.Targets,
 		Message: req.Message,
-		Expires: ttl,
+		Expires: expires,
 	})
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -2473,7 +2471,7 @@ func (h *Handler) deleteClusterLock(
 	sessionCtx *SessionContext,
 	site reversetunnel.RemoteSite) (interface{}, error) {
 	ctx := r.Context()
-	clt, err := sessionCtx.GetUserClient(r.Context(), site)
+	clt, err := sessionCtx.GetUserClient(ctx, site)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
